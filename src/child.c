@@ -1,5 +1,6 @@
 #include "child.h"
 #include "utils.h"
+#include "http.h"
 
 void child_main_loop(int sock) {
 

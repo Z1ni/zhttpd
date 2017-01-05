@@ -14,6 +14,7 @@ add_executable(${CMAKE_PROJECT_NAME}
 	src/main.c
 	src/child.c
 	src/utils.c
+	src/http.c
 )
 
 target_link_libraries(${CMAKE_PROJECT_NAME}
