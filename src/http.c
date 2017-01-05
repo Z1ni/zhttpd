@@ -180,7 +180,7 @@ void http_request_free(http_request *req) {
  * @brief Create HTTP response
  * @details Creates new \ref http_response with given status
  * 
- * @param int HTTP status code
+ * @param status HTTP status code
  * @return New \ref http_response or NULL on error
  */
 http_response * http_response_create(unsigned int status) {
