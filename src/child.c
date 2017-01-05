@@ -102,11 +102,11 @@ void child_main_loop(int sock) {
 				//printf("%s\n", received);
 				
 				printf("Creating response\n");
-				http_response *resp = http_response_create(500);
+				http_response *resp = http_response_create(501);
 				char *resp_html;
 				int c_len = asprintf(&resp_html,
 					"<html><head>\r\n \
-					<title>500 Not Implemented</title>\r\n \
+					<title>501 Not Implemented</title>\r\n \
 					</head></body>\r\n \
 					<h1>Not Implemented</h1>\r\n \
 					<p>Sorry, the server doesn't know how to handle the request.<br />\r\n \
