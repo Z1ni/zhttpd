@@ -381,6 +381,7 @@ int http_response_string(http_response *resp, char **out) {
 	char *date_str;
 	if (current_datetime_string(&date_str) < 0) return ERROR_RESPONSE_STRING_CREATE_FAILED;
 	if (http_response_add_header2(resp, "Date", date_str) < 0) return ERROR_RESPONSE_STRING_CREATE_FAILED;
+	free(date_str);
 
 	// Add Connection: close
 	// TODO: Support multiple requests through a single connection
