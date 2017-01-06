@@ -65,6 +65,9 @@ int main(int argc, char *argv[]) {
 	}
 
 	printf("Starting main loop, run_main_loop = %d\n", run_main_loop);
+
+	pid_t pid = 0;
+
 	while (run_main_loop == 0) {
 
 		struct sockaddr_in in_addr = {0};
@@ -79,16 +82,20 @@ int main(int argc, char *argv[]) {
 		} else {
 			printf("Connection accepted!\n");
 			// Fork!
-			pid_t pid = fork();
+			pid = fork();
 			if (pid == 0) {
 				printf("Forking\n");
+				close(server_sock);
 				child_main_loop(cli_sock);
-			}			
+				break;
+			} else {
+				close(cli_sock);
+			}
 		}
 		usleep(100);
 	}
 
-	printf("Main loop ended\n");
+	printf("Main loop ended in %s\n", (pid == 0 ? "child" : "parent"));
 
 	shutdown(server_sock, SHUT_RDWR);
 	close(server_sock);
