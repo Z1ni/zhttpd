@@ -57,17 +57,18 @@ int current_datetime_string(char **str) {
 }
 
 /**
- * @brief Split text by delimeter
- * @details Tokenizes text by given delimeter. Ignores subsequent delimeters.
+ * @brief Split text by delimiter
+ * @details Tokenizes text by given delimiter. Ignores subsequent delimiters.
  *          E.g. " foo   bar " splitted by ' ' becomes "foo", "bar".
  * 
  * @param in Text to split
  * @param in_len Length of \p in
- * @param delim Delimeter
+ * @param delim Delimiter
  * @param[out] out Pointer to non-allocated memory where the result will be saved
+ * @param limit How many splits to do. -1 means no limit, split all.
  * @return Word count
  */
-int split_line(const char *in, size_t in_len, char delim, char ***out) {
+int split_line2(const char *in, size_t in_len, char delim, char ***out, int limit) {
 
 	size_t words_cap = 10;
 	size_t words_count = 0;
@@ -78,24 +79,26 @@ int split_line(const char *in, size_t in_len, char delim, char ***out) {
 
 	int word_in_progress = 0;
 	for (size_t i = 0; i < in_len; i++) {
-		if (in[i] == delim) {
-			// Skip delimeters
-			if (word_in_progress == 1) word_in_progress = 0;
-			continue;
-		}
-		if (word_in_progress == 0 && word_pos > 0) {
-			// Save word
-			word = realloc(word, (word_pos+1) * sizeof(char));
-			word[word_pos] = '\0';
-			if (words_count+1 > words_cap) {
-				words_cap *= 2;
-				words = realloc(words, words_cap * sizeof(char *));
+		if (limit == -1 || (limit != -1 && words_count < limit)) {
+			if (in[i] == delim) {
+				// Skip delimiters
+				if (word_in_progress == 1) word_in_progress = 0;
+				continue;
 			}
-			words[words_count++] = word;
-			
-			word = NULL;
-			word_pos = 0;
-			word = calloc(word_cap, sizeof(char));
+			if (word_in_progress == 0 && word_pos > 0) {
+				// Save word
+				word = realloc(word, (word_pos+1) * sizeof(char));
+				word[word_pos] = '\0';
+				if (words_count+1 > words_cap) {
+					words_cap *= 2;
+					words = realloc(words, words_cap * sizeof(char *));
+				}
+				words[words_count++] = word;
+				
+				word = NULL;
+				word_pos = 0;
+				word = calloc(word_cap, sizeof(char));
+			}
 		}
 
 		word_in_progress = 1;
@@ -118,6 +121,22 @@ int split_line(const char *in, size_t in_len, char delim, char ***out) {
 	words = realloc(words, words_count * sizeof(char *));
 	(*out) = words;
 	return words_count;
+}
+
+/**
+ * @brief Split text by delimiter
+ * @details Tokenizes text by given delimiter. Ignores subsequent delimiters.
+ *          E.g. " foo   bar " splitted by ' ' becomes "foo", "bar".
+ *          Calls split_line2() with \p limit -1
+ * 
+ * @param in Text to split
+ * @param in_len Length of \p in
+ * @param delim Delimiter
+ * @param[out] out Pointer to non-allocated memory where the result will be saved
+ * @return Word count
+ */
+int split_line(const char *in, size_t in_len, char delim, char ***out) {
+	return split_line2(in, in_len, delim, out, -1);
 }
 
 /**

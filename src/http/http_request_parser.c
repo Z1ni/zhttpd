@@ -176,9 +176,19 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 	for (size_t i = 1; i < header_count+1; i++) {
 		// Split header line
 		char **header_words;
-		size_t header_words_count = split_line(lines[i], strlen(lines[i]), ' ', &header_words);
+		size_t header_words_count = split_line2(lines[i], strlen(lines[i]), ' ', &header_words, 1);
 		
+		if (header_words_count != 2) {
+			// Invalid header
+			// TODO: Maybe ignore invalid headers?
+			fprintf(stderr, "Invalid header: %s\n", lines[i]);
+			split_line_free(header_words, header_words_count);
+			split_line_free(lines, lines_count);
+			return ERROR_PARSER_MALFORMED_REQUEST;
+		}
+
 		char *header_name = header_words[0];
+		char *header_value = header_words[1];
 
 		if (header_name[strlen(header_name)-1] != ':') {
 			// Not valid header, header name must end with :
@@ -189,14 +199,28 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 		}
 		header_name[strlen(header_name)-1] = '\0';	// Remove trailing ':'
 
-		printf("Valid header name: %s\n", header_name);
+		// Add header to the request
+		int header_add_ret = http_request_add_header2(req, header_name, header_value);
+		if (header_add_ret < 0) {
+			// Adding failed
+			// TODO: Maybe ignore error?
+			fprintf(stderr, "http_request_add_header2 failed: %d\n", header_add_ret);
+			split_line_free(header_words, header_words_count);
+			split_line_free(lines, lines_count);
+			return header_add_ret;
+		}
 
 		split_line_free(header_words, header_words_count);
 	}
 
 	// Cleanup
 	split_line_free(lines, lines_count);
+
+	// TODO: Check that the request has all necessary headers
 	
+	// TODO: Parse possible payload (in POST, etc.)
+	// TODO: Check if there's leftover data
+
 	*out = req;
 
 	return 0;

@@ -101,14 +101,24 @@ void child_main_loop(int sock) {
 				// Receiving ends
 				// Handle final received data here ================================================
 				
-				printf("%u bytes\n", got_bytes);
-				printf("%s\n", received);
+				/*printf("%u bytes\n", got_bytes);
+				printf("%s\n", received);*/
 				
 				http_request *req;
 				int ret = http_request_parse(received, got_bytes, &req);
 				if (ret < 0) {
 					fprintf(stderr, "http_request_parse failed with error code: %d\n", ret);
 				} else {
+					printf("\nNew http_request:\n");
+					printf("  Method: %s\n", req->method);
+					printf("  Path: %s\n", req->path);
+					printf("  %u headers:\n", req->header_count);
+					for (size_t i = 0; i < req->header_count; i++) {
+						http_header *h = req->headers[i];
+						printf("    %s: \"%s\"\n", h->name, h->value);
+					}
+					printf("\n");
+
 					http_request_free(req);
 				}
 

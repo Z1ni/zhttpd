@@ -21,6 +21,7 @@ int current_datetime_string(char **out);
 int current_datetime_string2(char **out, const char *format);
 
 int split_line(const char *in, size_t in_len, char delim, char ***out);
+int split_line2(const char *in, size_t in_len, char delim, char ***out, int limit);
 void split_line_free(char **words, size_t len);
 
 #endif
