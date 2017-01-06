@@ -10,7 +10,7 @@ void child_main_loop(int sock) {
 	// Make given socket nonblocking
 	if (make_socket_nonblocking(sock) == -1) abort();
 
-	struct epoll_event event;
+	struct epoll_event event = {0};
 	struct epoll_event *events = calloc(MAX_EPOLL_EVENTS, sizeof(event));
 	int efd = epoll_create1(0);
 	if (efd == -1) {
