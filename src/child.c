@@ -1,6 +1,7 @@
 #include "child.h"
 #include "utils.h"
 #include "http.h"
+#include "http_request_parser.h"
 
 void child_main_loop(int sock) {
 
@@ -100,8 +101,17 @@ void child_main_loop(int sock) {
 				// Receiving ends
 				// Handle final received data here ================================================
 				
-				//printf("%s\n", received);
+				printf("%u bytes\n", got_bytes);
+				printf("%s\n", received);
 				
+				http_request *req;
+				int ret = http_request_parse(received, got_bytes, &req);
+				if (ret < 0) {
+					fprintf(stderr, "http_request_parse failed with error code: %d\n", ret);
+				} else {
+					http_request_free(req);
+				}
+
 				printf("Creating response\n");
 				http_response *resp = http_response_create(501);
 				char *resp_html;

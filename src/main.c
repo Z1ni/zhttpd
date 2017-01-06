@@ -34,6 +34,12 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
+	int enable = 1;
+	if (setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
+		perror("setsockopt");
+		exit(1);
+	}
+
 	printf("Binding socket\n");
 	struct sockaddr_in bind_addr;
 	memset(&bind_addr, 0, sizeof(bind_addr));
