@@ -52,6 +52,24 @@ typedef struct {
 	size_t _header_cap;		/**< Header list capacity ("private") */
 } http_response;
 
+/**
+ * \struct HTTP status list entry
+ */
+typedef struct {
+	unsigned int status;	/**< Status code */
+	char *reason;			/**< Textual reason */
+	size_t reason_length;	/**< Length of reason string */
+	char *err_msg;			/**< Textual error message for error page */
+	size_t err_msg_length;	/**< Length of error message */
+} http_status_entry;
+
+/**
+ * HTTP status codes and reason strings
+ */
+extern http_status_entry status_entries[];
+
+// Status entries =============================================================
+http_status_entry * http_status_get_entry(unsigned int status);
 
 // HTTP Header ================================================================
 http_header * http_header_create(char *name, char *value);

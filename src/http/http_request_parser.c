@@ -173,6 +173,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 		return ERROR_PARSER_MALFORMED_REQUEST;
 	}
 
+	int got_host_header = 0;
 	for (size_t i = 1; i < header_count+1; i++) {
 		// Split header line
 		char **header_words;
@@ -199,6 +200,8 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 		}
 		header_name[strlen(header_name)-1] = '\0';	// Remove trailing ':'
 
+		if (strcmp(header_name, "Host")) got_host_header = 1;
+
 		// Add header to the request
 		int header_add_ret = http_request_add_header2(req, header_name, header_value);
 		if (header_add_ret < 0) {
@@ -217,6 +220,11 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 	split_line_free(lines, lines_count);
 
 	// TODO: Check that the request has all necessary headers
+	if (got_host_header == 0) {
+		// HTTP 1.1 requires Host header
+		fprintf(stderr, "Missing Host header\n");
+		return ERROR_PARSER_NO_HOST_HEADER;
+	}
 	
 	// TODO: Parse possible payload (in POST, etc.)
 	// TODO: Check if there's leftover data

@@ -1,6 +1,40 @@
 #include "http.h"
 
 /**
+ * HTTP status codes and reason strings
+ */
+http_status_entry status_entries[] = {
+	{200, "OK",                    2,  NULL,                                                               0},
+	{500, "Internal Server Error", 21, "Unknown server error.",                                            21},
+	{501, "Not Implemented",       15, "Sorry, the server doesn't know how to handle the request.",        57},
+	{400, "Bad Request",           11, "Received request was malformed.",                                  31},
+	{404, "Not Found",             9,  "Requested file not found.",                                        25},
+	{0, NULL, 0, NULL, 0}	// Guard entry, must be last
+};
+
+/**
+ * @brief Get HTTP status entry
+ * @details Gets corresponding status entry for status code
+ *
+ * @param status Status code
+ * @return Status entry or NULL on error
+ */
+http_status_entry * http_status_get_entry(unsigned int status) {
+	int pos = 0;
+	while (1) {
+		http_status_entry entry = status_entries[pos];
+		if (entry.status == 0 && entry.reason == NULL && entry.reason_length == 0 &&
+			entry.err_msg == NULL && entry.err_msg_length == 0) break;	// Found last (guard) entry
+		if (entry.status == status) {
+			// Found correct entry
+			return &(status_entries[pos]);
+		}
+		pos++;
+	}
+	return NULL;	// Not found
+}
+
+/**
  * @brief Create HTTP header
  * @details Creates new \ref http_header with given name and value
  * 
@@ -362,10 +396,45 @@ void http_response_free(http_response *resp) {
 int http_response_string(http_response *resp, char **out) {
 	if (resp == NULL) return ERROR_RESPONSE_ARGUMENT;
 	
-	// TODO: Handle status code
-	// For now we just ignore the status code that the response has and use 501
-	int code = 501;
-	char *reason = "Not Implemented";
+	// Handle status code
+	int code = resp->status;
+
+	char *err_msg = NULL;
+	char *reason = NULL;
+
+	// Get reason string & error message
+	http_status_entry *status_entry;
+	status_entry = http_status_get_entry(code);
+	if (status_entry == NULL) {
+		// No entry, create 501 Not Implemented
+		code = 501;
+		reason = "Not Implemented";
+		err_msg = "Sorry, the server doesn't know how to handle the request.";
+	} else {
+		err_msg = status_entry->err_msg;
+		reason = status_entry->reason;
+	}
+
+	// TODO: On status != 200, add default error response content
+	if (code != 200) {
+		char *resp_html;
+		int c_len = asprintf(&resp_html,
+			"<html><head>\n \
+			<title>%d %s</title>\n \
+			</head></body>\n \
+			<h1>%s</h1>\n \
+			<p>%s<br />\n</p>\n \
+			<hr>\n \
+			<address>%s on port %d</address>\r\n</body></html>\n",
+			code, reason, reason, err_msg, SERVER_IDENT, 8080
+		);
+		http_response_set_content(resp, (unsigned char *)resp_html, c_len);
+		free(resp_html);
+
+	} else {
+		// 200 OK
+		reason = "OK";
+	}
 
 	// Add Content-Length
 	char *len_str = calloc(10, sizeof(char));
@@ -415,6 +484,7 @@ int http_response_string(http_response *resp, char **out) {
 		*out = realloc(*out, cap * sizeof(char));
 	}
 	used += snprintf(&((*out)[used]), cap - used, "\r\n");
+
 	// Message body
 	if (resp->content_length > 0 && resp->content != NULL) {
 		memcpy(&((*out)[used]), resp->content, resp->content_length);

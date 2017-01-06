@@ -108,6 +108,16 @@ void child_main_loop(int sock) {
 				int ret = http_request_parse(received, got_bytes, &req);
 				if (ret < 0) {
 					fprintf(stderr, "http_request_parse failed with error code: %d\n", ret);
+					if (ret == ERROR_PARSER_MALFORMED_REQUEST || ret == ERROR_PARSER_NO_HOST_HEADER) {
+						http_response *resp = http_response_create(400);
+						char *resp_str;
+						int len = http_response_string(resp, &resp_str);
+						if (len >= 0) {
+							write(sock, resp_str, len);
+							free(resp_str);
+						}
+						http_response_free(resp);
+					}
 				} else {
 					printf("\nNew http_request:\n");
 					printf("  Method: %s\n", req->method);
@@ -120,37 +130,23 @@ void child_main_loop(int sock) {
 					printf("\n");
 
 					http_request_free(req);
+
+					printf("Creating response\n");
+					http_response *resp = http_response_create(501);
+
+					printf("Creating response string\n");
+					char *resp_str;
+					int len = http_response_string(resp, &resp_str);
+					if (len >= 0) {
+						// Send response
+						printf("Sending response\n");
+						write(sock, resp_str, len);
+						printf("Response sent\n");
+						free(resp_str);
+					}
+
+					http_response_free(resp);
 				}
-
-				printf("Creating response\n");
-				http_response *resp = http_response_create(501);
-				char *resp_html;
-				int c_len = asprintf(&resp_html,
-					"<html><head>\r\n \
-					<title>501 Not Implemented</title>\r\n \
-					</head></body>\r\n \
-					<h1>Not Implemented</h1>\r\n \
-					<p>Sorry, the server doesn't know how to handle the request.<br />\r\n \
-					</p>\r\n \
-					<hr>\r\n \
-					<address>%s on port %d</address>\r\n</body></html>\r\n",
-					SERVER_IDENT, 8080
-				);
-				http_response_set_content(resp, (unsigned char *)resp_html, c_len);
-				free(resp_html);
-
-				printf("Creating response string\n");
-				char *resp_str;
-				int len = http_response_string(resp, &resp_str);
-				if (len >= 0) {
-					// Send response
-					printf("Sending response\n");
-					write(sock, resp_str, len);
-					printf("Response sent\n");
-					free(resp_str);
-				}
-
-				http_response_free(resp);
 
 
 				// Handling the data ends =========================================================
