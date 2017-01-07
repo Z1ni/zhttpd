@@ -13,6 +13,7 @@
 
 #define SERVER_IDENT "zhttpd/0.1-alpha"
 #define MAX_EPOLL_EVENTS 64
+#define REQUEST_TIMEOUT_SECONDS 10
 
 // Utility ====================================================================
 int make_socket_nonblocking(int sockfd);

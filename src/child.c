@@ -7,6 +7,9 @@ void child_main_loop(int sock) {
 
 	printf("child_main_loop\n");
 
+	// Get current time for recv timeout
+	time_t recv_start = time(NULL);
+
 	// Make given socket nonblocking
 	if (make_socket_nonblocking(sock) == -1) abort();
 
@@ -27,10 +30,12 @@ void child_main_loop(int sock) {
 
 	// TODO: Close connection after n seconds of inactivity (10 seconds or something like that)
 
+	int handled = 0;	// False
+
 	// Main event loop
-	int run = 0;
+	int run = 1;
 	printf("child_main_loop event loop start\n");
-	while (run == 0) {
+	while (run) {
 
 		//printf("wait\n");
 		int n = epoll_wait(efd, events, MAX_EPOLL_EVENTS, 0);
@@ -107,6 +112,7 @@ void child_main_loop(int sock) {
 				http_request *req;
 				int ret = http_request_parse(received, got_bytes, &req);
 				if (ret < 0) {
+					// TODO: Get more data if needed
 					fprintf(stderr, "http_request_parse failed with error code: %d\n", ret);
 					if (ret == ERROR_PARSER_MALFORMED_REQUEST || ret == ERROR_PARSER_NO_HOST_HEADER) {
 						http_response *resp = http_response_create(400);
@@ -153,12 +159,28 @@ void child_main_loop(int sock) {
 				free(received);
 				printf("\nReceived data handled\n");
 
-				run = 1;
+				// TODO: Don't set this if Connection header value is not "close"
+				recv_start = time(NULL);
+				handled = 1;
+				run = 0;
 			}
-
-			usleep(10);
-
 		}
+		usleep(10);
+
+		if (handled == 0 && time(NULL) - recv_start >= REQUEST_TIMEOUT_SECONDS) {
+			// Receive timeout
+			// Send "408 Request Timeout"
+			http_response *resp = http_response_create(408);
+			char *resp_str;
+			int len = http_response_string(resp, &resp_str);
+			if (len >= 0) {
+				write(sock, resp_str, len);
+				free(resp_str);
+			}
+			http_response_free(resp);
+			run = 0;
+		}
+
 	}
 	printf("child_main_loop event loop end\n");
 
