@@ -416,7 +416,7 @@ int http_response_string(http_response *resp, char **out) {
 		reason = status_entry->reason;
 	}
 
-	// TODO: On status != 200, add default error response content
+	// On status != 200, add default error response content
 	if (code != 200) {
 		char *resp_html;
 		int c_len = asprintf(&resp_html,

@@ -28,16 +28,20 @@ void child_main_loop(int sock) {
 		abort();
 	}
 
-	// TODO: Close connection after n seconds of inactivity (10 seconds or something like that)
-
 	int handled = 0;	// False
 
 	// Main event loop
 	int run = 1;
 	printf("child_main_loop event loop start\n");
+
+	unsigned int buf_size = 1024;
+	unsigned int got_bytes = 0;
+	unsigned int recv_buf_size = buf_size;
+
+	char *received = calloc(recv_buf_size, sizeof(char));
+
 	while (run) {
 
-		//printf("wait\n");
 		int n = epoll_wait(efd, events, MAX_EPOLL_EVENTS, 0);
 		for (int i = 0; i < n; i++) {
 
@@ -52,13 +56,9 @@ void child_main_loop(int sock) {
 				// We have data to be read!
 				printf("Child got data for reading\n");
 				int done = 0;
-				unsigned int buf_size = 1024;
-				unsigned int got_bytes = 0;
-				unsigned int recv_buf_size = buf_size;
-				
-				char *received = calloc(recv_buf_size, sizeof(char));
+
 				char *buf = calloc(buf_size, sizeof(char));
-				
+
 				while (1) {
 					ssize_t count = 0;
 
@@ -78,7 +78,6 @@ void child_main_loop(int sock) {
 					}
 
 					// Handle received data
-					//printf("Handle recv\n");
 					// Check if the received data fits into the final buffer
 					if (recv_buf_size < got_bytes + count) {
 						// Doesn't fit, resize buffer
@@ -88,7 +87,6 @@ void child_main_loop(int sock) {
 					// Copy received data to the final buffer
 					memcpy(&received[got_bytes], buf, count);
 					got_bytes += count;
-					//printf("Total bytes: %u\n", got_bytes);
 				}
 				free(buf);	// Free temp recv buffer
 
@@ -112,17 +110,23 @@ void child_main_loop(int sock) {
 				http_request *req;
 				int ret = http_request_parse(received, got_bytes, &req);
 				if (ret < 0) {
-					// TODO: Get more data if needed
-					fprintf(stderr, "http_request_parse failed with error code: %d\n", ret);
-					if (ret == ERROR_PARSER_MALFORMED_REQUEST || ret == ERROR_PARSER_NO_HOST_HEADER) {
-						http_response *resp = http_response_create(400);
-						char *resp_str;
-						int len = http_response_string(resp, &resp_str);
-						if (len >= 0) {
-							write(sock, resp_str, len);
-							free(resp_str);
+
+					if (ret == ERROR_PARSER_GET_MORE_DATA) {
+						// Need more data
+						printf("http_request_parse needs more data\n");
+						continue;
+					} else {
+						fprintf(stderr, "http_request_parse failed with error code: %d\n", ret);
+						if (ret == ERROR_PARSER_MALFORMED_REQUEST || ret == ERROR_PARSER_NO_HOST_HEADER) {
+							http_response *resp = http_response_create(400);
+							char *resp_str;
+							int len = http_response_string(resp, &resp_str);
+							if (len >= 0) {
+								write(sock, resp_str, len);
+								free(resp_str);
+							}
+							http_response_free(resp);
 						}
-						http_response_free(resp);
 					}
 				} else {
 					printf("\nNew http_request:\n");
@@ -157,6 +161,7 @@ void child_main_loop(int sock) {
 
 				// Handling the data ends =========================================================
 				free(received);
+				received = NULL;
 				printf("\nReceived data handled\n");
 
 				// TODO: Don't set this if Connection header value is not "close"
@@ -184,6 +189,7 @@ void child_main_loop(int sock) {
 	}
 	printf("child_main_loop event loop end\n");
 
+	if (received != NULL) free(received);
 	free(events);
 
 	// Close socket

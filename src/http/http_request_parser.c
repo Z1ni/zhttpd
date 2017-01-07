@@ -97,17 +97,18 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 	free(line);
 
 	if (status != PARSER_STATUS_HEADER_END) {
-		// The request is malformed or we don't have enough data
+		// It seems that we have no enough data
+		// Request more
 		split_line_free(lines, lines_count);
-		fprintf(stderr, "Request is malformed or no enough data\n");
-		return ERROR_PARSER_MALFORMED_REQUEST;
+		fprintf(stderr, "Possible data exhaustion\n");
+		return ERROR_PARSER_GET_MORE_DATA;
 	}
 
 	if (lines_count < 1) {
-		// No HTTP status line, malformed request
+		// No HTTP status line, possible data exhaustion
 		free(lines);
-		fprintf(stderr, "Request is malformed or no enough data (no enough lines)\n");
-		return ERROR_PARSER_MALFORMED_REQUEST;
+		fprintf(stderr, "Possible data exhaustion (no enough lines)\n");
+		return ERROR_PARSER_GET_MORE_DATA;
 	}
 
 	// We have now parsed first lines of the response containing (hopefully)
