@@ -16,7 +16,6 @@
 volatile sig_atomic_t run_main_loop = 0;
 
 static void signal_handler(int signal) {
-	//printf("Signal hander, sig: %d\n", signal);
 	run_main_loop = 1;
 }
 
@@ -24,8 +23,15 @@ int main(int argc, char *argv[]) {
 
 	const int port = 8080;
 
-	printf("Registering signal handler\n");
-	signal(SIGINT, signal_handler);
+	printf("Registering signal handler for SIGINT\n");
+	struct sigaction sigint_sigaction = {
+		.sa_handler = signal_handler
+	};
+
+	if (sigaction(SIGINT, &sigint_sigaction, NULL) == -1) {
+		perror("sigaction");
+		exit(1);
+	}
 
 	printf("Creating server socket\n");
 	int server_sock = socket(AF_INET, SOCK_STREAM, 0);

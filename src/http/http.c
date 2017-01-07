@@ -4,11 +4,11 @@
  * HTTP status codes and reason strings
  */
 http_status_entry status_entries[] = {
-	{200, "OK",                    2,  NULL,                                                               0},
-	{500, "Internal Server Error", 21, "Unknown server error.",                                            21},
-	{501, "Not Implemented",       15, "Sorry, the server doesn't know how to handle the request.",        57},
-	{400, "Bad Request",           11, "Received request was malformed.",                                  31},
-	{404, "Not Found",             9,  "Requested file not found.",                                        25},
+	{200, "OK",                    2,  NULL,                                                        0},
+	{500, "Internal Server Error", 21, "Unknown server error.",                                     21},
+	{501, "Not Implemented",       15, "Sorry, the server doesn't know how to handle the request.", 57},
+	{400, "Bad Request",           11, "Received request was malformed.",                           31},
+	{404, "Not Found",             9,  "Requested file not found.",                                 25},
 	{0, NULL, 0, NULL, 0}	// Guard entry, must be last
 };
 
