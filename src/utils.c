@@ -152,3 +152,18 @@ void split_line_free(char **words, size_t len) {
 	}
 	free(words);
 }
+
+/**
+ * @brief Convert string to lower case
+ * @details Converts upper/mixed case string to lower case.
+ * 
+ * @param str String to convert
+ * @return Dynamically allocated string in lower case. User is responsible for freeing the memory.
+ */
+char * string_to_lowercase(char *str) {
+	char *out = calloc(strlen(str)+1, sizeof(char));
+	for (int i = 0; i < strlen(str); i++) {
+		out[i] = tolower(str[i]);
+	}
+	return out;
+}

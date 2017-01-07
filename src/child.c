@@ -10,6 +10,8 @@ void child_main_loop(int sock) {
 	// Get current time for recv timeout
 	time_t recv_start = time(NULL);
 
+	time_t keepalive_timer = 0;
+
 	// Make given socket nonblocking
 	if (make_socket_nonblocking(sock) == -1) abort();
 
@@ -28,7 +30,10 @@ void child_main_loop(int sock) {
 		abort();
 	}
 
-	int handled = 0;	// False
+	int handled = 0;			// False
+	int request_num = 1;		// True
+	int keep_conn_alive = 0;	// False
+	int recv_timer_started = 1;	// True
 
 	// Main event loop
 	int run = 1;
@@ -57,6 +62,12 @@ void child_main_loop(int sock) {
 				printf("Child got data for reading\n");
 				int done = 0;
 				char *buf = NULL;
+
+				// Start recv timer if this isn't the first request
+				if (keep_conn_alive && !recv_timer_started) {
+					recv_start = time(NULL);
+					recv_timer_started = 1;
+				}
 
 				while (1) {
 					ssize_t count = 0;
@@ -154,10 +165,22 @@ void child_main_loop(int sock) {
 					}
 					printf("\n");
 
+					for (size_t i = 0; i < req->header_count; i++) {
+						http_header *h = req->headers[i];
+						if (strcmp(h->name, "Connection") == 0) {
+							char *value = string_to_lowercase(h->value);
+							if (strcmp(value, "keep-alive") == 0) keep_conn_alive = 1;	// Set to true
+							free(value);
+							if (keep_conn_alive) printf("Client wants to keep connection alive\n");
+							break;
+						}
+					}
+
 					http_request_free(req);
 
 					printf("Creating response\n");
 					http_response *resp = http_response_create(501);
+					resp->keep_alive = keep_conn_alive;
 
 					printf("Creating response string\n");
 					char *resp_str;
@@ -180,10 +203,16 @@ void child_main_loop(int sock) {
 				got_bytes = 0;
 				printf("\nReceived data handled\n");
 
-				// TODO: Don't set this if Connection header value is not "close"
-				recv_start = time(NULL);
 				handled = 1;
-				run = 0;
+				if (keep_conn_alive) {
+					printf("Starting keepalive timer\n");
+					keepalive_timer = time(NULL);
+					request_num++;
+					recv_buf_size = buf_size;
+					received = calloc(recv_buf_size, sizeof(char));
+				} else {
+					run = 0;
+				}
 			}
 		}
 		usleep(10);
@@ -199,6 +228,12 @@ void child_main_loop(int sock) {
 				free(resp_str);
 			}
 			http_response_free(resp);
+			run = 0;
+		}
+
+		if (keep_conn_alive && time(NULL) - keepalive_timer >= REQUEST_KEEPALIVE_TIMEOUT_SECONDS) {
+			// Keep-alive timeout
+			// Just close connection for now
 			run = 0;
 		}
 

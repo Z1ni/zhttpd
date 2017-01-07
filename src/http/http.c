@@ -226,6 +226,7 @@ http_response * http_response_create(unsigned int status) {
 	resp->content = NULL;
 	resp->_header_cap = 1;
 	resp->header_count = 0;
+	resp->keep_alive = 0;
 	resp->headers = calloc(resp->_header_cap, sizeof(http_header*));
 
 	return resp;
@@ -454,9 +455,12 @@ int http_response_string(http_response *resp, char **out) {
 	if (http_response_add_header2(resp, "Date", date_str) < 0) return ERROR_RESPONSE_STRING_CREATE_FAILED;
 	free(date_str);
 
-	// Add Connection: close
-	// TODO: Support multiple requests through a single connection
-	if (http_response_add_header2(resp, "Connection", "close") < 0) return ERROR_RESPONSE_STRING_CREATE_FAILED;
+	// Add Connection header
+	if (resp->keep_alive) {
+		if (http_response_add_header2(resp, "Connection", "keep-alive") < 0) return ERROR_RESPONSE_STRING_CREATE_FAILED;
+	} else {
+		if (http_response_add_header2(resp, "Connection", "close") < 0) return ERROR_RESPONSE_STRING_CREATE_FAILED;
+	}
 
 	// Add Content-Type
 	// TODO: Check with libmagic
