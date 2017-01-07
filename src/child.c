@@ -56,13 +56,13 @@ void child_main_loop(int sock) {
 				// We have data to be read!
 				printf("Child got data for reading\n");
 				int done = 0;
-
-				char *buf = calloc(buf_size, sizeof(char));
+				char *buf = NULL;
 
 				while (1) {
 					ssize_t count = 0;
 
-					count = read(events[i].data.fd, buf, sizeof(buf));
+					buf = calloc(buf_size, sizeof(char));
+					count = read(events[i].data.fd, buf, buf_size);
 					//printf("read: %u\n", count);
 					if (count == -1) {
 						// Error
@@ -79,20 +79,23 @@ void child_main_loop(int sock) {
 
 					// Handle received data
 					// Check if the received data fits into the final buffer
-					if (recv_buf_size < got_bytes + count) {
+					while (recv_buf_size < got_bytes + count) {
 						// Doesn't fit, resize buffer
 						recv_buf_size *= 2;
 						received = realloc(received, recv_buf_size * sizeof(char));
 					}
 					// Copy received data to the final buffer
 					memcpy(&received[got_bytes], buf, count);
+					free(buf);	// Free temp recv buffer
+					buf = NULL;
 					got_bytes += count;
 				}
-				free(buf);	// Free temp recv buffer
+				if (buf != NULL) free(buf);
 
 				// Add zero byte
 				// Resize the final recv data to fit
 				received = realloc(received, (got_bytes + 1) * sizeof(char));
+				recv_buf_size = got_bytes+1;
 				received[got_bytes] = '\0';
 
 				if (done) {
@@ -118,7 +121,19 @@ void child_main_loop(int sock) {
 					} else {
 						fprintf(stderr, "http_request_parse failed with error code: %d\n", ret);
 						if (ret == ERROR_PARSER_MALFORMED_REQUEST || ret == ERROR_PARSER_NO_HOST_HEADER) {
+							// Malformed request or HTTP/1.1 request without Host header
 							http_response *resp = http_response_create(400);
+							char *resp_str;
+							int len = http_response_string(resp, &resp_str);
+							if (len >= 0) {
+								write(sock, resp_str, len);
+								free(resp_str);
+							}
+							http_response_free(resp);
+
+						} else if (ret == ERROR_PARSER_INVALID_METHOD) {
+							// Unsupported method
+							http_response *resp = http_response_create(405);
 							char *resp_str;
 							int len = http_response_string(resp, &resp_str);
 							if (len >= 0) {
@@ -162,6 +177,7 @@ void child_main_loop(int sock) {
 				// Handling the data ends =========================================================
 				free(received);
 				received = NULL;
+				got_bytes = 0;
 				printf("\nReceived data handled\n");
 
 				// TODO: Don't set this if Connection header value is not "close"

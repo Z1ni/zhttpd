@@ -171,6 +171,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 		// No headers, malformed request
 		fprintf(stderr, "No headers\n");
 		split_line_free(lines, lines_count);
+		http_request_free(req);
 		return ERROR_PARSER_MALFORMED_REQUEST;
 	}
 
@@ -186,6 +187,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 			fprintf(stderr, "Invalid header: %s\n", lines[i]);
 			split_line_free(header_words, header_words_count);
 			split_line_free(lines, lines_count);
+			http_request_free(req);
 			return ERROR_PARSER_MALFORMED_REQUEST;
 		}
 
@@ -197,11 +199,12 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 			fprintf(stderr, "Invalid header name: \"%s\"\n", header_words[0]);
 			split_line_free(header_words, header_words_count);
 			split_line_free(lines, lines_count);
+			http_request_free(req);
 			return ERROR_PARSER_MALFORMED_REQUEST;
 		}
 		header_name[strlen(header_name)-1] = '\0';	// Remove trailing ':'
 
-		if (strcmp(header_name, "Host")) got_host_header = 1;
+		if (strcmp(header_name, "Host") == 0) got_host_header = 1;
 
 		// Add header to the request
 		int header_add_ret = http_request_add_header2(req, header_name, header_value);
@@ -211,6 +214,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 			fprintf(stderr, "http_request_add_header2 failed: %d\n", header_add_ret);
 			split_line_free(header_words, header_words_count);
 			split_line_free(lines, lines_count);
+			http_request_free(req);
 			return header_add_ret;
 		}
 
@@ -224,6 +228,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 	if (got_host_header == 0) {
 		// HTTP 1.1 requires Host header
 		fprintf(stderr, "Missing Host header\n");
+		http_request_free(req);
 		return ERROR_PARSER_NO_HOST_HEADER;
 	}
 	

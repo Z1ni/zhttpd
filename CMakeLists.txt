@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 
 project(zhttpd)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu11 -Wall -gstabs")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu11 -Wall -g")
 
 add_definitions(-D_GNU_SOURCE)	# Only for testing, enables the use of asprintf
 
@@ -14,7 +14,7 @@ add_executable(${CMAKE_PROJECT_NAME}
 	src/main.c
 	src/child.c
 	src/utils.c
-	
+
 	src/http/http.c
 	src/http/http_request_parser.c
 )
