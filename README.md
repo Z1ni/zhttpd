@@ -3,7 +3,7 @@ _simple (?) HTTP server in C_
 
 Works only with Linux >= 2.5.44.
 
-Currently reads requests and responds with "501 Not Implemented".
+Currently supports only GET requests.
 
 #### TODO:
 * Pretty much everything
