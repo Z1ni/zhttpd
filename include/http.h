@@ -84,6 +84,8 @@ http_request * http_request_create2(char *method, char *path);
 int http_request_add_header(http_request *req, http_header *header);
 int http_request_add_header2(http_request *req, char *header_name, char *header_value);
 
+int http_request_header_exists(http_request *req, char *header_name);
+
 int http_request_remove_header(http_request *req, char *header_name);
 
 void http_request_free(http_request *req);
@@ -93,6 +95,8 @@ http_response * http_response_create(unsigned int status);
 
 int http_response_add_header(http_response *resp, http_header *header);
 int http_response_add_header2(http_response *resp, char *header_name, char *header_value);
+
+int http_response_header_exists(http_response *resp, char *header_name);
 
 int http_response_remove_header(http_response *resp, char *header_name);
 

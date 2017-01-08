@@ -235,3 +235,52 @@ int create_real_path(const char *webroot, size_t webroot_len, const char *path, 
 	*out = real_path;
 	return real_path_pos;
 }
+
+/**
+ * @brief Get mimetype & charset string
+ * @details Uses libmagic to obtain mimetype and charset for given buffer
+ * 
+ * @param buf Buffer to check
+ * @param buf_len Length of \p buf
+ * @param[out] out Pointer to non-allocated memory that will contain the mimetype & charset string
+ * 
+ * @return 0 on success, < 0 on error
+ */
+int libmagic_get_mimetype(const unsigned char *buf, size_t buf_len, char **out) {
+
+	char *desc_out;
+
+	magic_t lm = magic_open(MAGIC_MIME_TYPE | MAGIC_MIME_ENCODING | MAGIC_NO_CHECK_COMPRESS | MAGIC_NO_CHECK_TAR | MAGIC_NO_CHECK_ELF | MAGIC_NO_CHECK_TOKENS | MAGIC_NO_CHECK_TROFF);
+	if (lm == NULL) {
+		fprintf(stderr, "magic_open: %s\n", magic_error(lm));
+		return -1;
+	}
+	if (magic_load(lm, NULL) == 1) {
+		fprintf(stderr, "magic_load: %s\n", magic_error(lm));
+		magic_close(lm);
+		return -1;
+	}
+
+	const char *desc = magic_buffer(lm, buf, buf_len);
+	if (desc == NULL) {
+		fprintf(stderr, "magic_file: %s\n", magic_error(lm));
+		magic_close(lm);
+		return -1;
+	}
+	desc_out = strdup(desc);
+
+	magic_close(lm);
+
+	// Remove "charset=binary" if needed
+	char *p = strstr(desc_out, "; charset=binary");
+	if (p != NULL) {
+		*p = '\0';
+		// "Realloc"
+		char *tmp = strdup(desc_out);
+		free(desc_out);
+		desc_out = tmp;
+	}
+
+	*out = desc_out;
+	return 0;
+}

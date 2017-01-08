@@ -156,6 +156,23 @@ int http_request_add_header2(http_request *req, char *header_name, char *header_
 }
 
 /**
+ * @brief Check if request contains header
+ * @details Checks existence of header with given name
+ * 
+ * @param req Request to use
+ * @param header_name Header name
+ * 
+ * @return 1 if header exists, 0 otherwise
+ */
+int http_request_header_exists(http_request *req, char *header_name) {
+	for (size_t i = 0; i < req->header_count; i++) {
+		http_header *h = req->headers[i];
+		if (strcmp(h->name, header_name) == 0) return 1;	// True
+	}
+	return 0;	// False
+}
+
+/**
  * @brief Remove header(s) by name from HTTP request
  * @details Removes headers by name from the given \ref http_request
  * 
@@ -278,6 +295,23 @@ int http_response_add_header2(http_response *resp, char *header_name, char *head
 }
 
 /**
+ * @brief Check if response contains header
+ * @details Checks existence of header with given name
+ * 
+ * @param resp Response to use
+ * @param header_name Header name
+ * 
+ * @return 1 if header exists, 0 otherwise
+ */
+int http_response_header_exists(http_response *resp, char *header_name) {
+	for (size_t i = 0; i < resp->header_count; i++) {
+		http_header *h = resp->headers[i];
+		if (strcmp(h->name, header_name) == 0) return 1;	// True
+	}
+	return 0;	// False
+}
+
+/**
  * @brief Remove header(s) by name from HTTP response
  * @details Removes headers by name from the given \ref http_response
  * 
@@ -346,12 +380,22 @@ int http_response_set_content2(http_response *resp, unsigned const char *content
 	memcpy(resp->content, content, content_len);
 
 	// Handle flags
-	if (flags & CONTENT_SET_CONTENT_TYPE) {
+	if ((flags & CONTENT_SET_CONTENT_TYPE) == CONTENT_SET_CONTENT_TYPE) {
 		// We should also set Content-Type -header
 		// Remove header if it already exists
-		if (http_response_remove_header(resp, "Content-Type") < 0) return ERROR_RESPONSE_SET_CONTENT_TYPE_FAILED;
+		http_response_remove_header(resp, "Content-Type");
 
-		// TODO: libmagic stuff
+		// Get Content-Type string (which may contain charset)
+		char *content_type;
+		if (libmagic_get_mimetype(content, content_len, &content_type) < 0) {
+			return ERROR_RESPONSE_SET_CONTENT_TYPE_FAILED;
+		}
+		printf("Content-Type: %s\n", content_type);
+		if (http_response_add_header2(resp, "Content-Type", content_type) < 0) {
+			free(content_type);
+			return ERROR_RESPONSE_SET_CONTENT_TYPE_FAILED;
+		}
+		free(content_type);
 	}
 
 	return resp->content_length;
@@ -463,10 +507,19 @@ int http_response_string(http_response *resp, char **out) {
 		if (http_response_add_header2(resp, "Connection", "close") < 0) return ERROR_RESPONSE_STRING_CREATE_FAILED;
 	}
 
-	// Add Content-Type
-	// TODO: Check with libmagic
-	// TODO: Only add if the header doesn't exist already
-	if (http_response_add_header2(resp, "Content-Type", "text/html; charset=iso-8859-1")) return ERROR_RESPONSE_STRING_CREATE_FAILED;
+	// Add Content-Type if needed
+	if (http_response_header_exists(resp, "Content-Type") == 0) {
+		// No header, add
+		char *content_type;
+		if (libmagic_get_mimetype(resp->content, resp->content_length, &content_type) < 0) {
+			return ERROR_RESPONSE_STRING_CREATE_FAILED;
+		}
+		if (http_response_add_header2(resp, "Content-Type", content_type) < 0) {
+			free(content_type);
+			return ERROR_RESPONSE_STRING_CREATE_FAILED;
+		}
+		free(content_type);
+	}
 
 	size_t used = 0;
 	size_t cap = 512;

@@ -12,6 +12,7 @@ Currently reads requests and responds with "501 Not Implemented".
 * cmake
 * gcc
 * doxygen (optional, for docs)
+* libmagic-dev
 
 ### Building & Running
 ```bash

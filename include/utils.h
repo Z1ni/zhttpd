@@ -10,6 +10,8 @@
 #include <time.h>
 #include <ctype.h>
 
+#include <magic.h>
+
 #include "errors.h"
 
 #define SERVER_IDENT "zhttpd/0.1-alpha"
@@ -31,5 +33,7 @@ void split_line_free(char **words, size_t len);
 char * string_to_lowercase(char *str);
 
 int create_real_path(const char *webroot, size_t webroot_len, const char *path, size_t path_len, char **out);
+
+int libmagic_get_mimetype(const unsigned char *buf, size_t buf_len, char **out);
 
 #endif
