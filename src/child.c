@@ -2,6 +2,7 @@
 #include "utils.h"
 #include "http.h"
 #include "http_request_parser.h"
+#include "file_io.h"
 
 void child_main_loop(int sock) {
 
@@ -176,9 +177,98 @@ void child_main_loop(int sock) {
 						}
 					}
 
+					if (strcmp(req->method, "GET") == 0) {
+						// TODO: Concatenate file path and prevent free filesystem access
+						char *final_path;
+						int rp_ret = create_real_path(WEBROOT, strlen(WEBROOT), req->path, strlen(req->path), &final_path);
+						if (rp_ret < 0) {
+							// Invalid path, send "400 Bad Request"
+							http_response *resp = http_response_create(400);
+							resp->keep_alive = keep_conn_alive;
+							char *resp_str;
+							int len = http_response_string(resp, &resp_str);
+							if (len >= 0) {
+								write(sock, resp_str, len);
+								free(resp_str);
+							}
+							http_response_free(resp);
+
+						} else {
+							// Valid path
+							printf("Client requests file \"%s\"\n", final_path);
+							unsigned char *file_data;
+							ssize_t file_bytes = read_file(final_path, &file_data);
+							if (file_bytes < 0) {
+								if (file_bytes == ERROR_FILE_IO_NO_ACCESS) {
+									// Respond with "403 Forbidden"
+									http_response *resp = http_response_create(403);
+									resp->keep_alive = keep_conn_alive;
+									char *resp_str;
+									int len = http_response_string(resp, &resp_str);
+									if (len >= 0) {
+										write(sock, resp_str, len);
+										free(resp_str);
+									}
+									http_response_free(resp);
+
+								} else if (file_bytes == ERROR_FILE_IO_NO_ENT) {
+									// File not found, respond with "404 File Not Found"
+									http_response *resp = http_response_create(404);
+									resp->keep_alive = keep_conn_alive;
+									char *resp_str;
+									int len = http_response_string(resp, &resp_str);
+									if (len >= 0) {
+										write(sock, resp_str, len);
+										free(resp_str);
+									}
+									http_response_free(resp);
+
+								} else if (file_bytes == ERROR_FILE_IO_GENERAL) {
+									// I/O error, response with "500 Internal Server Error"
+									http_response *resp = http_response_create(500);
+									resp->keep_alive = keep_conn_alive;
+									char *resp_str;
+									int len = http_response_string(resp, &resp_str);
+									if (len >= 0) {
+										write(sock, resp_str, len);
+										free(resp_str);
+									}
+									http_response_free(resp);
+								}
+							} else {
+								// Got file, send response
+								http_response *resp = http_response_create(200);
+								resp->keep_alive = keep_conn_alive;
+								http_response_set_content2(resp, file_data, file_bytes, CONTENT_SET_CONTENT_TYPE);
+								char *resp_str;
+								int len = http_response_string(resp, &resp_str);
+								if (len >= 0) {
+									write(sock, resp_str, len);
+									free(resp_str);
+								}
+								http_response_free(resp);
+								free(file_data);
+							}
+
+							free(final_path);
+						}
+
+					} else {
+						// Only GET is supported at this moment
+						http_response *resp = http_response_create(501);
+						resp->keep_alive = keep_conn_alive;
+						char *resp_str;
+						int len = http_response_string(resp, &resp_str);
+						if (len >= 0) {
+							write(sock, resp_str, len);
+							free(resp_str);
+						}
+						http_response_free(resp);
+					}
+
 					http_request_free(req);
 
-					printf("Creating response\n");
+					/*printf("Creating response\n");
 					http_response *resp = http_response_create(501);
 					resp->keep_alive = keep_conn_alive;
 
@@ -193,7 +283,7 @@ void child_main_loop(int sock) {
 						free(resp_str);
 					}
 
-					http_response_free(resp);
+					http_response_free(resp);*/
 				}
 
 

@@ -16,6 +16,7 @@
 #define MAX_EPOLL_EVENTS 64
 #define REQUEST_TIMEOUT_SECONDS 60	// For testing, normal value should be something like 10
 #define REQUEST_KEEPALIVE_TIMEOUT_SECONDS 10
+#define WEBROOT "/var/www-zhttpd/"
 
 // Utility ====================================================================
 int make_socket_nonblocking(int sockfd);
@@ -28,5 +29,7 @@ int split_line2(const char *in, size_t in_len, char delim, char ***out, int limi
 void split_line_free(char **words, size_t len);
 
 char * string_to_lowercase(char *str);
+
+int create_real_path(const char *webroot, size_t webroot_len, const char *path, size_t path_len, char **out);
 
 #endif

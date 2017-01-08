@@ -167,3 +167,71 @@ char * string_to_lowercase(char *str) {
 	}
 	return out;
 }
+
+/**
+ * @brief Create real filesystem path from webroot and request paths
+ * @details Concatenates webroot and request paths securely
+ * 
+ * @param webroot Webroot path
+ * @param webroot_len Length of \p webroot
+ * @param path Request path
+ * @param path_len Length of \p path
+ * @param[out] out Pointer to non-allocated memory that will contain the concatenated path
+ * @return Length of the concatenated path or < 0 on error
+ */
+int create_real_path(const char *webroot, size_t webroot_len, const char *path, size_t path_len, char **out) {
+	size_t real_path_cap = webroot_len + path_len;
+	char *real_path = calloc(webroot_len + path_len, sizeof(char));
+	size_t real_path_pos = 0;
+	memcpy(real_path, webroot, webroot_len);
+	real_path_pos += webroot_len;
+
+	if (real_path[real_path_pos-1] != '/') {
+		// Add trailing slash
+		real_path[real_path_pos++] = '/';
+	}
+
+	size_t path_start = (path[0] == '/' ? 1 : 0);	// Ignore prefixing slash if needed
+
+	char prev = (path_start ? '/' : real_path[real_path_pos-1]);
+	for (size_t i = path_start; i < path_len; i++) {
+		char c = path[i];
+		if (c == '.' && prev == '.') {
+			// Not allowed, the user tries to traverse the filesystem (e.g. "/../../../../etc/passwd")
+			free(real_path);
+			return ERROR_PATH_EXPLOITING;
+		}
+		if ((c == '/' && prev == '/') || (c == '.' && prev == '/')) {
+			// Invalid path, two slashes "//" or '.' following '/' ("/.")
+			free(real_path);
+			return ERROR_PATH_INVALID;
+		}
+		if ((c >= '-' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c == '_')) {
+			// Allowed character
+			real_path[real_path_pos++] = c;
+		} else {
+			// Not allowed character
+			free(real_path);
+			return ERROR_PATH_INVALID;
+		}
+
+		prev = c;
+	}
+
+	// If the path ends with '/', add "index.html"
+	// TODO: Select between "index.htm" and "index.html", etc.
+	if (real_path[real_path_pos-1] == '/') {
+		if (real_path_cap < real_path_pos + 10) {
+			real_path = realloc(real_path, (real_path_pos + 10) * sizeof(char));
+		}
+		memcpy(&real_path[real_path_pos], "index.html", 10 * sizeof(char));
+		real_path_pos += 10;
+	}
+
+	// Realloc
+	real_path = realloc(real_path, (real_path_pos+1) * sizeof(char));
+	real_path[real_path_pos] = '\0';
+
+	*out = real_path;
+	return real_path_pos;
+}

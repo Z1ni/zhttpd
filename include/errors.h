@@ -23,4 +23,17 @@
 #define ERROR_PARSER_NO_HOST_HEADER -5			/**< Missing Host header */
 #define ERROR_PARSER_GET_MORE_DATA -6			/**< Missing some data */
 
+/**
+ * Errors for \ref read_file
+ */
+#define ERROR_FILE_IO_NO_ACCESS -1	/**< File access denied */
+#define ERROR_FILE_IO_NO_ENT -2		/**< File doesn't exist */
+#define ERROR_FILE_IO_GENERAL -3	/**< General I/O error */
+
+/**
+ * Errors for \ref create_real_path
+ */
+#define ERROR_PATH_EXPLOITING -1	/**< User is trying to exploit file paths */
+#define ERROR_PATH_INVALID -2		/**< Invalid path */
+
 #endif

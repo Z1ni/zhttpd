@@ -8,6 +8,7 @@ http_status_entry status_entries[] = {
 	{500, "Internal Server Error", 21, "Unknown server error.",                                     21},
 	{501, "Not Implemented",       15, "Sorry, the server doesn't know how to handle the request.", 57},
 	{400, "Bad Request",           11, "Received request was malformed.",                           31},
+	{403, "Forbidden",             9,  "File access forbidden.",                                    22},
 	{404, "Not Found",             9,  "Requested file not found.",                                 25},
 	{405, "Method Not Allowed",    18, "Request contained unknown method.",                         33},
 	{408, "Request Time-out",      16, "No enough data received in a reasonable timeframe.",        50},
