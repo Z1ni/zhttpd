@@ -9,18 +9,47 @@
 #include <string.h>
 #include <time.h>
 #include <ctype.h>
+#include <stdarg.h>
+#include <unistd.h>
 
 #include <magic.h>
 
 #include "errors.h"
 
 #define SERVER_IDENT "zhttpd/0.1-alpha"
+#define LISTEN_PORT 8080
 #define MAX_EPOLL_EVENTS 64
 #define REQUEST_TIMEOUT_SECONDS 60	// For testing, normal value should be something like 10
 #define REQUEST_KEEPALIVE_TIMEOUT_SECONDS 10
 #define WEBROOT "/var/www-zhttpd/"
 
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
+
+#define COLOR_LOG_OUTPUT	/**< If defined, log output will be colored */
+
 // Utility ====================================================================
+
+/**
+ * \enum Log levels
+ */
+typedef enum {
+	LOG_CRIT,	/**< Critical, program can't recover */
+	LOG_ERROR,	/**< Error, program can recover */
+	LOG_WARN,	/**< Warning, higher priority notification */
+	LOG_INFO,	/**< Information, status messages etc. */
+	LOG_DEBUG	/**< Debug, detailed debugging information */
+} LOG_LEVEL;
+
+#define DEBUG_MIN_LEVEL LOG_DEBUG	/**< Minimum level to show in logs */
+
+void zhttpd_log(LOG_LEVEL level, const char *format, ...);
+
 int make_socket_nonblocking(int sockfd);
 
 int current_datetime_string(char **out);

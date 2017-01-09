@@ -100,14 +100,14 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 		// It seems that we have no enough data
 		// Request more
 		split_line_free(lines, lines_count);
-		fprintf(stderr, "Possible data exhaustion\n");
+		zhttpd_log(LOG_WARN, "Possible request data exhaustion");
 		return ERROR_PARSER_GET_MORE_DATA;
 	}
 
 	if (lines_count < 1) {
 		// No HTTP status line, possible data exhaustion
 		free(lines);
-		fprintf(stderr, "Possible data exhaustion (no enough lines)\n");
+		zhttpd_log(LOG_WARN, "Possible request data exhaustion (no enough lines)");
 		return ERROR_PARSER_GET_MORE_DATA;
 	}
 
@@ -119,7 +119,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 	int word_count = split_line(lines[0], strlen(lines[0]), ' ', &words);
 	if (word_count != 3) {
 		// Malformed request
-		fprintf(stderr, "Status line contains != 3 words\n");
+		zhttpd_log(LOG_WARN, "Malformed request, status line size wrong");
 		split_line_free(words, word_count);
 		split_line_free(lines, lines_count);
 		return ERROR_PARSER_MALFORMED_REQUEST;
@@ -135,7 +135,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 	if (strcmp(method, "GET") != 0 && strcmp(method, "HEAD") != 0 && strcmp(method, "POST") != 0 && strcmp(method, "PUT") != 0 &&
 		strcmp(method, "DELETE") != 0 && strcmp(method, "CONNECT") != 0 && strcmp(method, "OPTIONS") != 0 && strcmp(method, "TRACE") != 0) {
 		// Not valid method
-		fprintf(stderr, "Invalid method %s\n", method);
+		zhttpd_log(LOG_WARN, "Invalid request method %s", method);
 		split_line_free(words, word_count);
 		split_line_free(lines, lines_count);
 		return ERROR_PARSER_INVALID_METHOD;
@@ -145,7 +145,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 	if (strlen(path) > 8000) {
 		// 414 URI Too Long
 		// return ERROR_PARSER_URI_TOO_LONG;
-		fprintf(stderr, "URI too long: %d characters, max: 8000\n", strlen(path));
+		zhttpd_log(LOG_WARN, "Request URI too long: %d characters, max: 8000", strlen(path));
 		split_line_free(words, word_count);
 		split_line_free(lines, lines_count);
 		return ERROR_PARSER_URI_TOO_LONG;
@@ -154,7 +154,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 	// Check HTTP version
 	if (strcmp(protocol, "HTTP/1.1") != 0) {
 		// Not supported protocol/protocol version
-		fprintf(stderr, "Unsupported protocol %s\n", protocol);
+		zhttpd_log(LOG_WARN, "Request has unsupported protocol %s", protocol);
 		split_line_free(words, word_count);
 		split_line_free(lines, lines_count);
 		return ERROR_PARSER_UNSUPPORTED_PROTOCOL;
@@ -169,7 +169,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 	size_t header_count = lines_count - 1;
 	if (header_count == 0) {
 		// No headers, malformed request
-		fprintf(stderr, "No headers\n");
+		zhttpd_log(LOG_WARN, "Request contains no headers");
 		split_line_free(lines, lines_count);
 		http_request_free(req);
 		return ERROR_PARSER_MALFORMED_REQUEST;
@@ -184,7 +184,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 		if (header_words_count != 2) {
 			// Invalid header
 			// TODO: Maybe ignore invalid headers?
-			fprintf(stderr, "Invalid header: %s\n", lines[i]);
+			zhttpd_log(LOG_WARN, "Invalid request header: %s", lines[i]);
 			split_line_free(header_words, header_words_count);
 			split_line_free(lines, lines_count);
 			http_request_free(req);
@@ -196,7 +196,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 
 		if (header_name[strlen(header_name)-1] != ':') {
 			// Not valid header, header name must end with :
-			fprintf(stderr, "Invalid header name: \"%s\"\n", header_words[0]);
+			zhttpd_log(LOG_WARN, "Invalid request header name: \"%s\"", header_words[0]);
 			split_line_free(header_words, header_words_count);
 			split_line_free(lines, lines_count);
 			http_request_free(req);
@@ -211,7 +211,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 		if (header_add_ret < 0) {
 			// Adding failed
 			// TODO: Maybe ignore error?
-			fprintf(stderr, "http_request_add_header2 failed: %d\n", header_add_ret);
+			zhttpd_log(LOG_ERROR, "http_request_add_header2 failed: %d", header_add_ret);
 			split_line_free(header_words, header_words_count);
 			split_line_free(lines, lines_count);
 			http_request_free(req);
@@ -227,7 +227,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 	// TODO: Check that the request has all necessary headers
 	if (got_host_header == 0) {
 		// HTTP 1.1 requires Host header
-		fprintf(stderr, "Missing Host header\n");
+		zhttpd_log(LOG_WARN, "Request is missing Host header");
 		http_request_free(req);
 		return ERROR_PARSER_NO_HOST_HEADER;
 	}

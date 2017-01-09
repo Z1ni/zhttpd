@@ -390,7 +390,7 @@ int http_response_set_content2(http_response *resp, unsigned const char *content
 		if (libmagic_get_mimetype(content, content_len, &content_type) < 0) {
 			return ERROR_RESPONSE_SET_CONTENT_TYPE_FAILED;
 		}
-		printf("Content-Type: %s\n", content_type);
+		zhttpd_log(LOG_DEBUG, "Detected Content-Type: %s", content_type);
 		if (http_response_add_header2(resp, "Content-Type", content_type) < 0) {
 			free(content_type);
 			return ERROR_RESPONSE_SET_CONTENT_TYPE_FAILED;
@@ -474,7 +474,7 @@ int http_response_string(http_response *resp, char **out) {
 			<p>%s<br />\n</p>\n \
 			<hr>\n \
 			<address>%s on port %d</address>\r\n</body></html>\n",
-			code, reason, reason, err_msg, SERVER_IDENT, 8080
+			code, reason, reason, err_msg, SERVER_IDENT, LISTEN_PORT
 		);
 		http_response_set_content(resp, (unsigned char *)resp_html, c_len);
 		free(resp_html);

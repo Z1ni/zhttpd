@@ -21,58 +21,62 @@ static void signal_handler(int signal) {
 
 int main(int argc, char *argv[]) {
 
-	const int port = 8080;
+	zhttpd_log(LOG_INFO, "zhttpd starting on port %d", LISTEN_PORT);
 
-	printf("Registering signal handler for SIGINT\n");
+	zhttpd_log(LOG_DEBUG, "Registering signal handler for SIGINT");
 	struct sigaction sigint_sigaction = {
 		.sa_handler = signal_handler
 	};
 
 	if (sigaction(SIGINT, &sigint_sigaction, NULL) == -1) {
+		zhttpd_log(LOG_CRIT, "Signal handler registering failed!");
 		perror("sigaction");
 		exit(1);
 	}
 
-	printf("Creating server socket\n");
+	zhttpd_log(LOG_DEBUG, "Creating server socket");
 	int server_sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (server_sock == -1) {
+		zhttpd_log(LOG_CRIT, "Server socket init failed!");
 		perror("Listen socket init");
 		exit(1);
 	}
 
 	int enable = 1;
 	if (setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
+		zhttpd_log(LOG_CRIT, "Server socket option setting failed!");
 		perror("setsockopt");
 		exit(1);
 	}
 
-	printf("Binding socket\n");
+	zhttpd_log(LOG_DEBUG, "Binding server socket");
 	struct sockaddr_in bind_addr;
 	memset(&bind_addr, 0, sizeof(bind_addr));
 
 	bind_addr.sin_family = AF_INET;
 	bind_addr.sin_addr.s_addr = INADDR_ANY;
-	bind_addr.sin_port = htons(port);
+	bind_addr.sin_port = htons(LISTEN_PORT);
 
 	if (bind(server_sock, (struct sockaddr *)&bind_addr, sizeof(bind_addr)) == -1) {
+		zhttpd_log(LOG_CRIT, "Server socket binding failed!");
 		perror("Listen socket bind");
 		exit(1);
 	}
 
-	printf("Making socket nonblocking\n");
 	if (make_socket_nonblocking(server_sock) == -1) {
-		abort();
+		zhttpd_log(LOG_CRIT, "Setting server socket non-blocking failed!");
+		exit(1);
 	}
 
-	printf("Listen\n");
 	if (listen(server_sock, 5) == -1) {
+		zhttpd_log(LOG_CRIT, "Connection listening failed!");
 		perror("Server listen");
 		exit(1);
 	}
 
-	printf("Starting main loop, run_main_loop = %d\n", run_main_loop);
+	zhttpd_log(LOG_INFO, "zhttpd ready, waiting for connections");
 
-	pid_t pid = 0;
+	pid_t pid = 1234;
 
 	while (run_main_loop == 0) {
 
@@ -82,15 +86,15 @@ int main(int argc, char *argv[]) {
 		int cli_sock = accept(server_sock, (struct sockaddr *)&in_addr, &in_len);
 		if (cli_sock == -1) {
 			if (errno != EAGAIN && errno != EWOULDBLOCK) {
+				zhttpd_log(LOG_ERROR, "Connection accepting failed!");
 				perror("accept");
-				break;
+				continue;
 			}
 		} else {
-			printf("Connection accepted!\n");
+			zhttpd_log(LOG_INFO, "New connection accepted");
 			// Fork!
 			pid = fork();
 			if (pid == 0) {
-				printf("Forking\n");
 				close(server_sock);
 				child_main_loop(cli_sock);
 				break;
@@ -101,12 +105,13 @@ int main(int argc, char *argv[]) {
 		usleep(100);
 	}
 
-	printf("Main loop ended in %s\n", (pid == 0 ? "child" : "parent"));
-
 	shutdown(server_sock, SHUT_RDWR);
 	close(server_sock);
 
-	printf("Bye\n");
+	if (pid == 0) {
+		zhttpd_log(LOG_DEBUG, "Child process shutdown");
+	} else {
+		zhttpd_log(LOG_INFO, "zhttpd exiting");
+	}
 	return 0;
-
 }

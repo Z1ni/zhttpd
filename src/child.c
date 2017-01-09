@@ -6,7 +6,7 @@
 
 void child_main_loop(int sock) {
 
-	printf("child_main_loop\n");
+	zhttpd_log(LOG_INFO, "Child process started to handle the connection");
 
 	// Get current time for recv timeout
 	time_t recv_start = time(NULL);
@@ -20,6 +20,7 @@ void child_main_loop(int sock) {
 	struct epoll_event *events = calloc(MAX_EPOLL_EVENTS, sizeof(event));
 	int efd = epoll_create1(0);
 	if (efd == -1) {
+		zhttpd_log(LOG_CRIT, "Epoll init failed!");
 		perror("child epoll_create1");
 		abort();
 	}
@@ -27,6 +28,7 @@ void child_main_loop(int sock) {
 	event.data.fd = sock;
 	event.events = EPOLLIN | EPOLLET;
 	if (epoll_ctl(efd, EPOLL_CTL_ADD, sock, &event) == -1) {
+		zhttpd_log(LOG_CRIT, "Epoll control failed!");
 		perror("child epoll_ctl");
 		abort();
 	}
@@ -38,7 +40,7 @@ void child_main_loop(int sock) {
 
 	// Main event loop
 	int run = 1;
-	printf("child_main_loop event loop start\n");
+	zhttpd_log(LOG_DEBUG, "Child event loop starting");
 
 	unsigned int buf_size = 1024;
 	unsigned int got_bytes = 0;
@@ -53,14 +55,14 @@ void child_main_loop(int sock) {
 
 			if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (!(events[i].events & EPOLLIN))) {
 				// Error
-				fprintf(stderr, "child epoll error\n");
+				zhttpd_log(LOG_ERROR, "Child Epoll wait failed!");
 				close(events[i].data.fd);
 				run = 1;	// Stop main child loop
 				break;
 			
 			} else {
 				// We have data to be read!
-				printf("Child got data for reading\n");
+				zhttpd_log(LOG_DEBUG, "Incoming data");
 				int done = 0;
 				char *buf = NULL;
 
@@ -79,12 +81,14 @@ void child_main_loop(int sock) {
 					if (count == -1) {
 						// Error
 						if (errno != EAGAIN) {
+							zhttpd_log(LOG_ERROR, "Data reading failed!");
 							perror("child read");
 							done = 1;
 						}
 						break;
 					} else if (count == 0) {
 						// Remote closed
+						zhttpd_log(LOG_INFO, "Remote end closed the connection");
 						done = 1;
 						break;
 					}
@@ -111,7 +115,6 @@ void child_main_loop(int sock) {
 				received[got_bytes] = '\0';
 
 				if (done) {
-					printf("Connection closed, fd: %d\n", events[i].data.fd);
 					close(events[i].data.fd);
 					run = 1;	// Stop the main child loop
 				}
@@ -119,19 +122,17 @@ void child_main_loop(int sock) {
 				// Receiving ends
 				// Handle final received data here ================================================
 				
-				/*printf("%u bytes\n", got_bytes);
-				printf("%s\n", received);*/
-				
 				http_request *req;
 				int ret = http_request_parse(received, got_bytes, &req);
 				if (ret < 0) {
 
 					if (ret == ERROR_PARSER_GET_MORE_DATA) {
 						// Need more data
-						printf("http_request_parse needs more data\n");
+						zhttpd_log(LOG_DEBUG, "Need more data to parse the request");
 						continue;
 					} else {
-						fprintf(stderr, "http_request_parse failed with error code: %d\n", ret);
+						zhttpd_log(LOG_ERROR, "Request parsing failed with error code %d", ret);
+						//fprintf(stderr, "http_request_parse failed with error code: %d\n", ret);
 						if (ret == ERROR_PARSER_MALFORMED_REQUEST || ret == ERROR_PARSER_NO_HOST_HEADER) {
 							// Malformed request or HTTP/1.1 request without Host header
 							http_response *resp = http_response_create(400);
@@ -156,15 +157,14 @@ void child_main_loop(int sock) {
 						}
 					}
 				} else {
-					printf("\nNew http_request:\n");
-					printf("  Method: %s\n", req->method);
-					printf("  Path: %s\n", req->path);
-					printf("  %u headers:\n", req->header_count);
+					zhttpd_log(LOG_DEBUG, "New HTTP request:");
+					zhttpd_log(LOG_DEBUG, "  Method: %s", req->method);
+					zhttpd_log(LOG_DEBUG, "  Path: %s", req->path);
+					zhttpd_log(LOG_DEBUG, "  %u header(s):", req->header_count);
 					for (size_t i = 0; i < req->header_count; i++) {
 						http_header *h = req->headers[i];
-						printf("    %s: \"%s\"\n", h->name, h->value);
+						zhttpd_log(LOG_DEBUG, "    %s: \"%s\"", h->name, h->value);
 					}
-					printf("\n");
 
 					for (size_t i = 0; i < req->header_count; i++) {
 						http_header *h = req->headers[i];
@@ -172,7 +172,7 @@ void child_main_loop(int sock) {
 							char *value = string_to_lowercase(h->value);
 							if (strcmp(value, "keep-alive") == 0) keep_conn_alive = 1;	// Set to true
 							free(value);
-							if (keep_conn_alive) printf("Client wants to keep connection alive\n");
+							if (keep_conn_alive) zhttpd_log(LOG_DEBUG, "Client wants to keep connection alive");
 							break;
 						}
 					}
@@ -195,7 +195,7 @@ void child_main_loop(int sock) {
 
 						} else {
 							// Valid path
-							printf("Client requests file \"%s\"\n", final_path);
+							zhttpd_log(LOG_INFO, "Client requests file: \"%s\"", final_path);
 							unsigned char *file_data;
 							ssize_t file_bytes = read_file(final_path, &file_data);
 							if (file_bytes < 0) {
@@ -267,35 +267,17 @@ void child_main_loop(int sock) {
 					}
 
 					http_request_free(req);
-
-					/*printf("Creating response\n");
-					http_response *resp = http_response_create(501);
-					resp->keep_alive = keep_conn_alive;
-
-					printf("Creating response string\n");
-					char *resp_str;
-					int len = http_response_string(resp, &resp_str);
-					if (len >= 0) {
-						// Send response
-						printf("Sending response\n");
-						write(sock, resp_str, len);
-						printf("Response sent\n");
-						free(resp_str);
-					}
-
-					http_response_free(resp);*/
 				}
-
 
 				// Handling the data ends =========================================================
 				free(received);
 				received = NULL;
 				got_bytes = 0;
-				printf("\nReceived data handled\n");
+				zhttpd_log(LOG_DEBUG, "Received data handled");
 
 				handled = 1;
 				if (keep_conn_alive) {
-					printf("Starting keepalive timer\n");
+					zhttpd_log(LOG_DEBUG, "Starting keepalive timer");
 					keepalive_timer = time(NULL);
 					request_num++;
 					recv_buf_size = buf_size;
@@ -310,6 +292,7 @@ void child_main_loop(int sock) {
 		if (handled == 0 && time(NULL) - recv_start >= REQUEST_TIMEOUT_SECONDS) {
 			// Receive timeout
 			// Send "408 Request Timeout"
+			zhttpd_log(LOG_INFO, "Client request timeout");
 			http_response *resp = http_response_create(408);
 			char *resp_str;
 			int len = http_response_string(resp, &resp_str);
@@ -324,11 +307,12 @@ void child_main_loop(int sock) {
 		if (keep_conn_alive && time(NULL) - keepalive_timer >= REQUEST_KEEPALIVE_TIMEOUT_SECONDS) {
 			// Keep-alive timeout
 			// Just close connection for now
+			zhttpd_log(LOG_INFO, "Client connection keep-alive timeout");
 			run = 0;
 		}
 
 	}
-	printf("child_main_loop event loop end\n");
+	zhttpd_log(LOG_INFO, "Child request handler process closing");
 
 	if (received != NULL) free(received);
 	free(events);

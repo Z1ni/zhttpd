@@ -1,6 +1,78 @@
 #include "utils.h"
 
 /**
+ * @brief Log strings to stdout
+ * @details Logs formatted and possibly colored strings to stdout.
+ * 			Maximum message length is 1023 characters
+ * 			Output is colored if COLOR_LOG_OUTPUT is defined.
+ * 
+ * @param level Log level, see \ref LOG_LEVEL
+ * @param format printf format string
+ */
+void zhttpd_log(LOG_LEVEL level, const char *format, ...) {
+	if (level > DEBUG_MIN_LEVEL) return;
+	const char *final_format = "%s [%5d] [%s] - %s\n";
+	char final_format_str[1024] = {0};
+	char final_str[1024] = {0};
+	char *level_str = NULL;
+
+	char *date_str;
+	if (current_datetime_string2(&date_str, "%Y-%m-%d %H:%M:%S") < 0) return;
+
+	if (level == LOG_CRIT) {
+		#ifdef COLOR_LOG_OUTPUT
+		level_str = ANSI_COLOR_RED "CRIT " ANSI_COLOR_RESET;
+		#else
+		level_str = "CRIT ";
+		#endif
+
+	} else if (level == LOG_ERROR) {
+		#ifdef COLOR_LOG_OUTPUT
+		level_str = ANSI_COLOR_RED "ERROR" ANSI_COLOR_RESET;
+		#else
+		level_str = "ERROR";
+		#endif
+
+	} else if (level == LOG_WARN) {
+		#ifdef COLOR_LOG_OUTPUT
+		level_str = ANSI_COLOR_YELLOW "WARN " ANSI_COLOR_RESET;
+		#else
+		level_str = "WARN ";
+		#endif
+
+	} else if (level == LOG_INFO) {
+		#ifdef COLOR_LOG_OUTPUT
+		level_str = ANSI_COLOR_CYAN "INFO " ANSI_COLOR_RESET;
+		#else
+		level_str = "INFO ";
+		#endif
+
+	} else if (level == LOG_DEBUG) {
+		#ifdef COLOR_LOG_OUTPUT
+		level_str = ANSI_COLOR_GREEN "DEBUG" ANSI_COLOR_RESET;
+		#else
+		level_str = "DEBUG";
+		#endif
+
+	} else {
+		level_str = "-----";
+	}
+
+	if (snprintf(final_format_str, 1023, final_format, date_str, getpid(), level_str, format) < 0) return;
+	free(date_str);
+	va_list args;
+	va_start(args, format);
+	int r = vsnprintf(final_str, 1023, final_format_str, args);
+	va_end(args);
+	if (r < 0) return;
+
+	// final_str contains final string
+	FILE *dest = stdout;
+	if (level <= LOG_ERROR) dest = stderr;	// Log errors and critical messages to stderr
+	fprintf(dest, "%s", final_str);
+}
+
+/**
  * @brief Make socket non-blocking
  * @details Makes socket non-blocking
  * 
@@ -252,18 +324,18 @@ int libmagic_get_mimetype(const unsigned char *buf, size_t buf_len, char **out) 
 
 	magic_t lm = magic_open(MAGIC_MIME_TYPE | MAGIC_MIME_ENCODING | MAGIC_NO_CHECK_COMPRESS | MAGIC_NO_CHECK_TAR | MAGIC_NO_CHECK_ELF | MAGIC_NO_CHECK_TOKENS | MAGIC_NO_CHECK_TROFF);
 	if (lm == NULL) {
-		fprintf(stderr, "magic_open: %s\n", magic_error(lm));
+		zhttpd_log(LOG_ERROR, "Libmagic open failed: %s", magic_error(lm));
 		return -1;
 	}
 	if (magic_load(lm, NULL) == 1) {
-		fprintf(stderr, "magic_load: %s\n", magic_error(lm));
+		zhttpd_log(LOG_ERROR, "Libmagic load failed: %s", magic_error(lm));
 		magic_close(lm);
 		return -1;
 	}
 
 	const char *desc = magic_buffer(lm, buf, buf_len);
 	if (desc == NULL) {
-		fprintf(stderr, "magic_file: %s\n", magic_error(lm));
+		zhttpd_log(LOG_ERROR, "Libmagic buffer detect failed: %s", magic_error(lm));
 		magic_close(lm);
 		return -1;
 	}
