@@ -28,6 +28,7 @@ static void sigchld_handler(int signal, siginfo_t *siginfo, void *context) {
 		zhttpd_log(LOG_ERROR, "Waitpid failed!");
 		perror("waitpid");
 	}
+	zhttpd_log(LOG_DEBUG, "SIGCHLD handled");
 }
 
 int main(int argc, char *argv[]) {
@@ -116,10 +117,11 @@ int main(int argc, char *argv[]) {
 		} else {
 			zhttpd_log(LOG_INFO, "New connection accepted");
 			// Fork!
+			pid_t parent_pid = getpid();
 			pid = fork();
 			if (pid == 0) {
 				close(server_sock);
-				child_main_loop(cli_sock);
+				child_main_loop(cli_sock, parent_pid);
 				break;
 			} else {
 				close(cli_sock);

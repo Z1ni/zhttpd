@@ -4,9 +4,40 @@
 #include "http_request_parser.h"
 #include "file_io.h"
 
-void child_main_loop(int sock) {
+volatile sig_atomic_t run_child_main_loop = 1;
+
+static void sigint_handler(int signal) {
+	// Parent died or someone wants this process to stop
+	zhttpd_log(LOG_WARN, "Child received SIGINT, closing");
+	run_child_main_loop = 0;
+}
+
+void child_main_loop(int sock, pid_t parent_pid) {
 
 	zhttpd_log(LOG_INFO, "Child process started to handle the connection");
+
+	// Make kernel notify with SIGINT if the parent dies
+	if (prctl(PR_SET_PDEATHSIG, SIGINT) == -1) {
+		zhttpd_log(LOG_CRIT, "Child prctl failed!");
+		perror("prctl");
+		abort();
+	}
+	if (getppid() != parent_pid) {
+		// Detect possible race condition, see http://stackoverflow.com/a/36945270
+		// TODO: Handle this better?
+		zhttpd_log(LOG_CRIT, "Child prctl race condition!");
+		abort();
+	}
+
+	// Set SIGINT handler
+	struct sigaction sigint_sigaction = {
+		.sa_handler = sigint_handler
+	};
+	if (sigaction(SIGINT, &sigint_sigaction, NULL) == -1) {
+		zhttpd_log(LOG_CRIT, "Child SIGINT signal handler registering failed!");
+		perror("sigaction");
+		abort();
+	}
 
 	// Get current time for recv timeout
 	time_t recv_start = time(NULL);
@@ -39,7 +70,6 @@ void child_main_loop(int sock) {
 	int recv_timer_started = 1;	// True
 
 	// Main event loop
-	int run = 1;
 	zhttpd_log(LOG_DEBUG, "Child event loop starting");
 
 	unsigned int buf_size = 1024;
@@ -48,7 +78,7 @@ void child_main_loop(int sock) {
 
 	char *received = calloc(recv_buf_size, sizeof(char));
 
-	while (run) {
+	while (run_child_main_loop) {
 
 		int n = epoll_wait(efd, events, MAX_EPOLL_EVENTS, 0);
 		for (int i = 0; i < n; i++) {
@@ -57,7 +87,7 @@ void child_main_loop(int sock) {
 				// Error
 				zhttpd_log(LOG_ERROR, "Child Epoll wait failed!");
 				close(events[i].data.fd);
-				run = 1;	// Stop main child loop
+				run_child_main_loop = 0;	// Stop main child loop
 				break;
 			
 			} else {
@@ -116,7 +146,7 @@ void child_main_loop(int sock) {
 
 				if (done) {
 					close(events[i].data.fd);
-					run = 1;	// Stop the main child loop
+					run_child_main_loop = 0;	// Stop the main child loop
 				}
 
 				// Receiving ends
@@ -283,7 +313,7 @@ void child_main_loop(int sock) {
 					recv_buf_size = buf_size;
 					received = calloc(recv_buf_size, sizeof(char));
 				} else {
-					run = 0;
+					run_child_main_loop = 0;
 				}
 			}
 		}
@@ -301,14 +331,14 @@ void child_main_loop(int sock) {
 				free(resp_str);
 			}
 			http_response_free(resp);
-			run = 0;
+			run_child_main_loop = 0;
 		}
 
 		if (keep_conn_alive && time(NULL) - keepalive_timer >= REQUEST_KEEPALIVE_TIMEOUT_SECONDS) {
 			// Keep-alive timeout
 			// Just close connection for now
 			zhttpd_log(LOG_INFO, "Client connection keep-alive timeout");
-			run = 0;
+			run_child_main_loop = 0;
 		}
 
 	}

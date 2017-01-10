@@ -11,7 +11,9 @@
 #include <netinet/in.h>
 #include <sys/epoll.h>
 #include <errno.h>
+#include <signal.h>
+#include <sys/prctl.h>
 
-void child_main_loop(int sock);
+void child_main_loop(int sock, pid_t parent_pid);
 
 #endif
