@@ -178,7 +178,7 @@ void child_main_loop(int sock) {
 					}
 
 					if (strcmp(req->method, "GET") == 0) {
-						// TODO: Concatenate file path and prevent free filesystem access
+						// Concatenate file path and prevent free filesystem access
 						char *final_path;
 						int rp_ret = create_real_path(WEBROOT, strlen(WEBROOT), req->path, strlen(req->path), &final_path);
 						if (rp_ret < 0) {
@@ -287,7 +287,7 @@ void child_main_loop(int sock) {
 				}
 			}
 		}
-		usleep(10);
+		usleep(5000);
 
 		if (handled == 0 && time(NULL) - recv_start >= REQUEST_TIMEOUT_SECONDS) {
 			// Receive timeout

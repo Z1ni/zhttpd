@@ -224,7 +224,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 	// Cleanup
 	split_line_free(lines, lines_count);
 
-	// TODO: Check that the request has all necessary headers
+	// Check that the request has all necessary headers
 	if (got_host_header == 0) {
 		// HTTP 1.1 requires Host header
 		zhttpd_log(LOG_WARN, "Request is missing Host header");

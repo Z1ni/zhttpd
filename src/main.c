@@ -9,14 +9,25 @@
 #include <sys/epoll.h>
 #include <signal.h>
 #include <errno.h>
+#include <sys/wait.h>
 
 #include "child.h"
 #include "utils.h"
 
 volatile sig_atomic_t run_main_loop = 0;
 
-static void signal_handler(int signal) {
+static void sigint_handler(int signal) {
 	run_main_loop = 1;
+}
+
+static void sigchld_handler(int signal, siginfo_t *siginfo, void *context) {
+	pid_t chld_pid = siginfo->si_pid;
+	int exit_status = siginfo->si_status;
+	zhttpd_log(LOG_DEBUG, "Child process %d exited with status code %d, reaping", chld_pid, exit_status);
+	if (waitpid(chld_pid, NULL, 0) == -1) {
+		zhttpd_log(LOG_ERROR, "Waitpid failed!");
+		perror("waitpid");
+	}
 }
 
 int main(int argc, char *argv[]) {
@@ -25,11 +36,23 @@ int main(int argc, char *argv[]) {
 
 	zhttpd_log(LOG_DEBUG, "Registering signal handler for SIGINT");
 	struct sigaction sigint_sigaction = {
-		.sa_handler = signal_handler
+		.sa_handler = sigint_handler
 	};
 
 	if (sigaction(SIGINT, &sigint_sigaction, NULL) == -1) {
-		zhttpd_log(LOG_CRIT, "Signal handler registering failed!");
+		zhttpd_log(LOG_CRIT, "SIGINT signal handler registering failed!");
+		perror("sigaction");
+		exit(1);
+	}
+
+	zhttpd_log(LOG_DEBUG, "Registering signal handler for SIGCHLD");
+	struct sigaction sigchld_sigaction = {
+		.sa_sigaction = sigchld_handler,
+		.sa_flags = SA_SIGINFO
+	};
+
+	if (sigaction(SIGCHLD, &sigchld_sigaction, NULL) == -1) {
+		zhttpd_log(LOG_CRIT, "SIGCHLD signal handler registering failed!");
 		perror("sigaction");
 		exit(1);
 	}
@@ -102,7 +125,7 @@ int main(int argc, char *argv[]) {
 				close(cli_sock);
 			}
 		}
-		usleep(100);
+		usleep(5000);
 	}
 
 	shutdown(server_sock, SHUT_RDWR);
