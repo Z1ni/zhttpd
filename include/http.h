@@ -35,6 +35,7 @@ typedef struct {
 	char *path;					/**< Path (e.g. "/", "index.html", ...) */
 	http_header **headers;		/**< List of headers */
 	size_t header_count;		/**< Header count */
+	int keep_alive;				/**< Is the Connection header value "keep-alive" */
 
 	size_t _header_cap;			/**< Header list capacity ("private") */
 } http_request;

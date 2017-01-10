@@ -12,6 +12,33 @@ static void sigint_handler(int signal) {
 	run_child_main_loop = 0;
 }
 
+/**
+ * @brief Send HTTP response with given status code
+ * @details Sends HTTP response with given non-OK (200) status code
+ * 
+ * @param req Request
+ * @param sock Socket
+ * @param status HTTP status code
+ * @return write() return value
+ */
+static int send_error_response(http_request *req, int sock, int status) {
+	http_response *resp = http_response_create(status);
+	if (req != NULL) {
+		resp->keep_alive = req->keep_alive;
+	} else {
+		resp->keep_alive = 0;
+	}
+	char *resp_str;
+	int len = http_response_string(resp, &resp_str);
+	int write_res = 0;
+	if (len >= 0) {
+		write_res = write(sock, resp_str, len);
+		free(resp_str);
+	}
+	http_response_free(resp);
+	return write_res;
+}
+
 void child_main_loop(int sock, pid_t parent_pid) {
 
 	zhttpd_log(LOG_INFO, "Child process started to handle the connection");
@@ -165,25 +192,11 @@ void child_main_loop(int sock, pid_t parent_pid) {
 						//fprintf(stderr, "http_request_parse failed with error code: %d\n", ret);
 						if (ret == ERROR_PARSER_MALFORMED_REQUEST || ret == ERROR_PARSER_NO_HOST_HEADER) {
 							// Malformed request or HTTP/1.1 request without Host header
-							http_response *resp = http_response_create(400);
-							char *resp_str;
-							int len = http_response_string(resp, &resp_str);
-							if (len >= 0) {
-								write(sock, resp_str, len);
-								free(resp_str);
-							}
-							http_response_free(resp);
+							send_error_response(NULL, sock, 400);
 
 						} else if (ret == ERROR_PARSER_INVALID_METHOD) {
 							// Unsupported method
-							http_response *resp = http_response_create(405);
-							char *resp_str;
-							int len = http_response_string(resp, &resp_str);
-							if (len >= 0) {
-								write(sock, resp_str, len);
-								free(resp_str);
-							}
-							http_response_free(resp);
+							send_error_response(NULL, sock, 405);
 						}
 					}
 				} else {
@@ -200,7 +213,10 @@ void child_main_loop(int sock, pid_t parent_pid) {
 						http_header *h = req->headers[i];
 						if (strcmp(h->name, "Connection") == 0) {
 							char *value = string_to_lowercase(h->value);
-							if (strcmp(value, "keep-alive") == 0) keep_conn_alive = 1;	// Set to true
+							if (strcmp(value, "keep-alive") == 0) {
+								keep_conn_alive = 1;	// Set to true
+								req->keep_alive = 1;
+							}
 							free(value);
 							if (keep_conn_alive) zhttpd_log(LOG_DEBUG, "Client wants to keep connection alive");
 							break;
@@ -213,15 +229,7 @@ void child_main_loop(int sock, pid_t parent_pid) {
 						int rp_ret = create_real_path(WEBROOT, strlen(WEBROOT), req->path, strlen(req->path), &final_path);
 						if (rp_ret < 0) {
 							// Invalid path, send "400 Bad Request"
-							http_response *resp = http_response_create(400);
-							resp->keep_alive = keep_conn_alive;
-							char *resp_str;
-							int len = http_response_string(resp, &resp_str);
-							if (len >= 0) {
-								write(sock, resp_str, len);
-								free(resp_str);
-							}
-							http_response_free(resp);
+							send_error_response(req, sock, 400);
 
 						} else {
 							// Valid path
@@ -231,39 +239,15 @@ void child_main_loop(int sock, pid_t parent_pid) {
 							if (file_bytes < 0) {
 								if (file_bytes == ERROR_FILE_IO_NO_ACCESS) {
 									// Respond with "403 Forbidden"
-									http_response *resp = http_response_create(403);
-									resp->keep_alive = keep_conn_alive;
-									char *resp_str;
-									int len = http_response_string(resp, &resp_str);
-									if (len >= 0) {
-										write(sock, resp_str, len);
-										free(resp_str);
-									}
-									http_response_free(resp);
+									send_error_response(req, sock, 403);
 
 								} else if (file_bytes == ERROR_FILE_IO_NO_ENT) {
 									// File not found, respond with "404 File Not Found"
-									http_response *resp = http_response_create(404);
-									resp->keep_alive = keep_conn_alive;
-									char *resp_str;
-									int len = http_response_string(resp, &resp_str);
-									if (len >= 0) {
-										write(sock, resp_str, len);
-										free(resp_str);
-									}
-									http_response_free(resp);
+									send_error_response(req, sock, 404);
 
 								} else if (file_bytes == ERROR_FILE_IO_GENERAL) {
 									// I/O error, response with "500 Internal Server Error"
-									http_response *resp = http_response_create(500);
-									resp->keep_alive = keep_conn_alive;
-									char *resp_str;
-									int len = http_response_string(resp, &resp_str);
-									if (len >= 0) {
-										write(sock, resp_str, len);
-										free(resp_str);
-									}
-									http_response_free(resp);
+									send_error_response(req, sock, 500);
 								}
 							} else {
 								// Got file, send response
@@ -285,15 +269,8 @@ void child_main_loop(int sock, pid_t parent_pid) {
 
 					} else {
 						// Only GET is supported at this moment
-						http_response *resp = http_response_create(501);
-						resp->keep_alive = keep_conn_alive;
-						char *resp_str;
-						int len = http_response_string(resp, &resp_str);
-						if (len >= 0) {
-							write(sock, resp_str, len);
-							free(resp_str);
-						}
-						http_response_free(resp);
+						// Send "501 Not Implemented"
+						send_error_response(req, sock, 501);
 					}
 
 					http_request_free(req);
@@ -323,14 +300,8 @@ void child_main_loop(int sock, pid_t parent_pid) {
 			// Receive timeout
 			// Send "408 Request Timeout"
 			zhttpd_log(LOG_INFO, "Client request timeout");
-			http_response *resp = http_response_create(408);
-			char *resp_str;
-			int len = http_response_string(resp, &resp_str);
-			if (len >= 0) {
-				write(sock, resp_str, len);
-				free(resp_str);
-			}
-			http_response_free(resp);
+
+			send_error_response(NULL, sock, 408);
 			run_child_main_loop = 0;
 		}
 
@@ -338,6 +309,7 @@ void child_main_loop(int sock, pid_t parent_pid) {
 			// Keep-alive timeout
 			// Just close connection for now
 			zhttpd_log(LOG_INFO, "Client connection keep-alive timeout");
+
 			run_child_main_loop = 0;
 		}
 
