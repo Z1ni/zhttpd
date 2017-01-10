@@ -177,6 +177,18 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 
 	int got_host_header = 0;
 	for (size_t i = 1; i < header_count+1; i++) {
+
+		if (i > 0 && (lines[i][0] == ' ' || lines[i][0] == '\t')) {
+			/* The parser has stumbled upon a folded header value
+			 * This has been obsoleted and must be responded with 400 Bad Request
+			 * For more information, see RFC 7230 Section 3.2.4.
+			 */
+			zhttpd_log(LOG_WARN, "Request contains folded headers, disallowed");
+			split_line_free(lines, lines_count);
+			http_request_free(req);
+			return ERROR_PARSER_MALFORMED_REQUEST;
+		}
+
 		// Split header line
 		char **header_words;
 		size_t header_words_count = split_line2(lines[i], strlen(lines[i]), ' ', &header_words, 1);
