@@ -60,9 +60,7 @@ typedef struct {
 typedef struct {
 	unsigned int status;	/**< Status code */
 	char *reason;			/**< Textual reason */
-	size_t reason_length;	/**< Length of reason string */
 	char *err_msg;			/**< Textual error message for error page */
-	size_t err_msg_length;	/**< Length of error message */
 } http_status_entry;
 
 /**

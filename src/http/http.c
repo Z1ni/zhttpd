@@ -4,15 +4,15 @@
  * HTTP status codes and reason strings
  */
 http_status_entry status_entries[] = {
-	{200, "OK",                    2,  NULL,                                                        0},
-	{500, "Internal Server Error", 21, "Unknown server error.",                                     21},
-	{501, "Not Implemented",       15, "Sorry, the server doesn't know how to handle the request.", 57},
-	{400, "Bad Request",           11, "Received request was malformed.",                           31},
-	{403, "Forbidden",             9,  "File access forbidden.",                                    22},
-	{404, "Not Found",             9,  "Requested file not found.",                                 25},
-	{405, "Method Not Allowed",    18, "Request contained unknown method.",                         33},
-	{408, "Request Time-out",      16, "No enough data received in a reasonable timeframe.",        50},
-	{0, NULL, 0, NULL, 0}	// Guard entry, must be last
+	{200, "OK",                    NULL},
+	{500, "Internal Server Error", "Unknown server error."},
+	{501, "Not Implemented",       "Sorry, the server doesn't know how to handle the request."},
+	{400, "Bad Request",           "Received request was malformed."},
+	{403, "Forbidden",             "File access forbidden."},
+	{404, "Not Found",             "Requested file not found."},
+	{405, "Method Not Allowed",    "Request contained unknown method."},
+	{408, "Request Time-out",      "No enough data received in a reasonable timeframe."},
+	{0, NULL, NULL}	// Guard entry, must be last
 };
 
 /**
@@ -26,8 +26,9 @@ http_status_entry * http_status_get_entry(unsigned int status) {
 	int pos = 0;
 	while (1) {
 		http_status_entry entry = status_entries[pos];
-		if (entry.status == 0 && entry.reason == NULL && entry.reason_length == 0 &&
-			entry.err_msg == NULL && entry.err_msg_length == 0) break;	// Found last (guard) entry
+		if (entry.status == 0 && entry.reason == NULL && entry.err_msg == NULL) {
+			break;	// Found last (guard) entry
+		}
 		if (entry.status == status) {
 			// Found correct entry
 			return &(status_entries[pos]);
