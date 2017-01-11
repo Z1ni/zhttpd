@@ -366,7 +366,7 @@ int libmagic_get_mimetype(const unsigned char *buf, size_t buf_len, char **out) 
  * @param[out] out Pointer to non-allocated memory where the result will be placed
  * @return Length of \p out in bytes or < 0 on error
  */
-size_t url_decode(const char *in, size_t in_len, char **out) {
+int url_decode(const char *in, size_t in_len, char **out) {
 	char *out_tmp = calloc(in_len, sizeof(char));
 	char hex[2] = {0};
 	int get_hex = 0;
@@ -424,7 +424,7 @@ size_t url_decode(const char *in, size_t in_len, char **out) {
  * @param out Pointer to non-allocated memory where the result will be placed
  * @return Length of \p out in bytes or < 0 on error
  */
-size_t url_encode(const char *in, size_t in_len, char **out) {
+int url_encode(const char *in, size_t in_len, char **out) {
 
 	char *out_tmp = calloc(in_len, sizeof(char));
 	size_t out_pos = 0;

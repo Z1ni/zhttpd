@@ -79,6 +79,7 @@ http_request * http_request_create() {
 	if (req == NULL) return NULL;
 	req->method = NULL;
 	req->path = NULL;
+	req->query_str = NULL;
 	req->header_count = 0;
 	req->_header_cap = 1;
 	req->headers = calloc(req->_header_cap, sizeof(http_header*));
@@ -96,15 +97,21 @@ http_request * http_request_create() {
  * 
  * @param method Request method (e.g. GET, POST, PUT, ...)
  * @param path Request path (e.g. "/", "/foo/bar.html")
+ * @param query Request query string (e.g. "foo=bar&val=baz&c=3")
  * 
  * @return New \ref http_request or NULL on error
  */
-http_request * http_request_create2(char *method, char *path) {
+http_request * http_request_create2(char *method, char *path, char *query) {
 	if (method == NULL || path == NULL) return NULL;
 	
 	http_request *req = calloc(1, sizeof(http_request));
 	req->method = strdup(method);
 	req->path = strdup(path);
+	if (query != NULL) {
+		req->query_str = strdup(query);
+	} else {
+		req->query_str = NULL;
+	}
 	req->header_count = 0;
 	req->_header_cap = 1;
 	req->headers = calloc(req->_header_cap, sizeof(http_header*));
@@ -223,6 +230,7 @@ void http_request_free(http_request *req) {
 	if (req == NULL) return;
 	if (req->method != NULL) free(req->method);
 	if (req->path != NULL) free(req->path);
+	if (req->query_str != NULL) free(req->query_str);
 	// Free headers
 	for (size_t i = 0; i < req->header_count; i++) {
 		http_header_free(req->headers[i]);

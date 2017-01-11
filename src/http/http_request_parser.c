@@ -160,9 +160,34 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 		return ERROR_PARSER_UNSUPPORTED_PROTOCOL;
 	}
 
+	// Extract possible query string
+	char *query_str = NULL;
+	int query_str_len = 0;
+
+	char *query_start = strstr(path, "?");
+	if (query_start != NULL) {
+		zhttpd_log(LOG_DEBUG, "Request contains a query string");
+		// TODO: Do this without pointer arithmetic?
+		query_start += sizeof(char);	// Advance one char
+		query_str_len = url_decode(query_start, strlen(query_start), &query_str);
+		if (query_str_len < 0) {
+			// url_decode failed
+			zhttpd_log(LOG_ERROR, "URL query string decoding failed!");
+			split_line_free(words, word_count);
+			split_line_free(lines, lines_count);
+			return ERROR_PARSER_MALFORMED_REQUEST;	// TODO: Return better error depending on return value
+		} else {
+			// Decoding successful
+			*(query_start-sizeof(char)) = '\0';	// Replace '?' with '\0' to end path string here
+			// We won't realloc path here, because it would mess up the split_line memory management
+		}
+	}
+
 	// Create http_request
-	http_request *req = http_request_create2(method, path);
-	
+	http_request *req = http_request_create2(method, path, query_str);
+
+	if (query_str != NULL) free(query_str);	// Because http_request_create2 uses strdup
+
 	split_line_free(words, word_count);
 
 	// Parse headers

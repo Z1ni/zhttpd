@@ -36,6 +36,7 @@ typedef struct {
 	http_header **headers;		/**< List of headers */
 	size_t header_count;		/**< Header count */
 	int keep_alive;				/**< Is the Connection header value "keep-alive" */
+	char *query_str;			/**< Query string */
 
 	size_t _header_cap;			/**< Header list capacity ("private") */
 } http_request;
@@ -78,7 +79,7 @@ void http_header_free(http_header *header);
 // HTTP Request ===============================================================
 http_request * http_request_create(void);
 
-http_request * http_request_create2(char *method, char *path);
+http_request * http_request_create2(char *method, char *path, char *query);
 
 int http_request_add_header(http_request *req, http_header *header);
 int http_request_add_header2(http_request *req, char *header_name, char *header_value);

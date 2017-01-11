@@ -65,7 +65,7 @@ int create_real_path(const char *webroot, size_t webroot_len, const char *path, 
 
 int libmagic_get_mimetype(const unsigned char *buf, size_t buf_len, char **out);
 
-size_t url_decode(const char *in, size_t in_len, char **out);
-size_t url_encode(const char *in, size_t in_len, char **out);
+int url_decode(const char *in, size_t in_len, char **out);
+int url_encode(const char *in, size_t in_len, char **out);
 
 #endif

@@ -203,6 +203,7 @@ void child_main_loop(int sock, pid_t parent_pid) {
 					zhttpd_log(LOG_DEBUG, "New HTTP request:");
 					zhttpd_log(LOG_DEBUG, "  Method: %s", req->method);
 					zhttpd_log(LOG_DEBUG, "  Path: %s", req->path);
+					if (req->query_str != NULL) zhttpd_log(LOG_DEBUG, "  Query: %s", req->query_str);
 					zhttpd_log(LOG_DEBUG, "  %u header(s):", req->header_count);
 					for (size_t i = 0; i < req->header_count; i++) {
 						http_header *h = req->headers[i];
