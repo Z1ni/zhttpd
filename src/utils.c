@@ -356,3 +356,114 @@ int libmagic_get_mimetype(const unsigned char *buf, size_t buf_len, char **out) 
 	*out = desc_out;
 	return 0;
 }
+
+/**
+ * @brief URL decode
+ * @details Decode URL-encoded text
+ * 
+ * @param in String to decode
+ * @param in_len Length of \p in
+ * @param[out] out Pointer to non-allocated memory where the result will be placed
+ * @return Length of \p out in bytes or < 0 on error
+ */
+size_t url_decode(const char *in, size_t in_len, char **out) {
+	char *out_tmp = calloc(in_len, sizeof(char));
+	char hex[2] = {0};
+	int get_hex = 0;
+	size_t hex_pos = 0;
+	size_t out_pos = 0;
+
+	for (size_t i = 0; i < in_len; i++) {
+		if (get_hex == 0 && in[i] == '%') {
+			// Decode
+			get_hex = 1;
+		} else if (get_hex == 1) {
+			// Read hex
+			hex[hex_pos++] = in[i];
+			if (hex_pos > 1) {
+				get_hex = 0;
+				hex_pos = 0;
+				// Decode hex to char
+				errno = 0;
+				long ret = strtol(hex, NULL, 16);
+				// TODO: Handle null bytes (if ret == 0)
+				if (errno != 0) {
+					// Failed
+					perror("strtol");
+					free(out_tmp);
+					return -1;
+				}
+				char c = (char)ret;
+				out_tmp[out_pos++] = c;
+			}
+		} else if (get_hex == 0) {
+			char out_c = in[i];
+			if (in[i] == '+') out_c = ' ';
+			out_tmp[out_pos++] = out_c;
+		}
+	}
+	if (hex_pos != 0) {
+		// Malformed input string
+		free(out_tmp);
+		return -1;
+	}
+
+	out_tmp = realloc(out_tmp, (out_pos+1) * sizeof(char));
+	out_tmp[out_pos] = '\0';
+
+	*out = out_tmp;
+	return out_pos;
+}
+
+/**
+ * @brief URL encode
+ * @details Encode text with "URL encoding"
+ * 
+ * @param in String to encode
+ * @param in_len Length of \p in
+ * @param out Pointer to non-allocated memory where the result will be placed
+ * @return Length of \p out in bytes or < 0 on error
+ */
+size_t url_encode(const char *in, size_t in_len, char **out) {
+
+	char *out_tmp = calloc(in_len, sizeof(char));
+	size_t out_pos = 0;
+	size_t out_cap = in_len;
+
+	for (size_t i = 0; i < in_len; i++) {
+		char c = in[i];
+		if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
+			// Normal ASCII char
+			if (out_cap < out_pos+1) {
+				// Realloc
+				out_cap *= 2;
+				out_tmp = realloc(out_tmp, out_cap * sizeof(char));
+			}
+			out_tmp[out_pos++] = c;
+		} else if (c == ' ') {
+			out_tmp[out_pos++] = '+';	// TODO: Let space be encoded as "%20" instead?
+		} else {
+			// Char needs to be encoded
+			char hex[4] = {0};
+			if (snprintf(hex, 4, "%%%X", c) != 3) {
+				// snprintf failed
+				free(out_tmp);
+				return -1;
+			}
+			if (out_cap < out_pos+3) {
+				// Realloc
+				out_cap *= 2;
+				out_tmp = realloc(out_tmp, out_cap * sizeof(char));
+			}
+			memcpy(&out_tmp[out_pos], hex, 3);
+			out_pos += 3;
+		}
+	}
+
+	out_tmp = realloc(out_tmp, (out_pos+1) * sizeof(char));
+	out_tmp[out_pos] = '\0';
+
+	*out = out_tmp;
+
+	return out_pos;
+}
