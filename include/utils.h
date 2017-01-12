@@ -11,6 +11,7 @@
 #include <ctype.h>
 #include <stdarg.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 #include <magic.h>
 

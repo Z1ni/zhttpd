@@ -268,7 +268,7 @@ char * string_to_uppercase(char *str) {
  */
 int create_real_path(const char *webroot, size_t webroot_len, const char *path, size_t path_len, char **out) {
 	size_t real_path_cap = webroot_len + path_len;
-	char *real_path = calloc(webroot_len + path_len, sizeof(char));
+	char *real_path = calloc(webroot_len + path_len + 1, sizeof(char));
 	size_t real_path_pos = 0;
 	memcpy(real_path, webroot, webroot_len);
 	real_path_pos += webroot_len;
@@ -303,6 +303,14 @@ int create_real_path(const char *webroot, size_t webroot_len, const char *path, 
 		}
 
 		prev = c;
+	}
+
+	// Check if real_path is pointing to a directory
+	struct stat path_stat;
+	stat(real_path, &path_stat);
+	if (stat(real_path, &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
+		// Is directory, append '/'
+		real_path[real_path_pos++] = '/';
 	}
 
 	// If the path ends with '/', add "index.html"
