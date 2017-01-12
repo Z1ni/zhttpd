@@ -182,7 +182,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 
 	char *header_end_pos;
 	char **lines;
-	size_t lines_count = 0;
+	int lines_count = 0;
 	lines_count = http_request_parse_header_lines(request, len, &lines, &header_end_pos);
 
 	if (lines_count < 0) {
