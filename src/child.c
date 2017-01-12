@@ -310,18 +310,38 @@ void child_main_loop(int sock, pid_t parent_pid) {
 
 								} else {
 									// Execution successful, send response
-									http_response *resp = http_response_create(200);
-									resp->keep_alive = keep_conn_alive;
-									if (strcmp(req->method, "HEAD") == 0) resp->head_response = 1;	// This is a HEAD response
 									// Set headers
 									int flags = CONTENT_SET_CONTENT_TYPE;
+									int status_code = -1;
 									for (size_t i = 0; i < cgi_header_count; i++) {
 										http_header *h = cgi_headers[i];
 										char *h_name = string_to_lowercase(h->name);
 										if (strcmp(h_name, "content-type") == 0) {
 											flags = 0;	// Don't guess Content-Type when it's already provided
 										}
-										http_response_add_header(resp, h);
+										if (strcmp(h_name, "status") == 0) {
+											// CGI script wants to set the status code
+											// Get status code
+											errno = 0;
+											status_code = strtol(h->value, NULL, 0);
+											if (errno != 0) {
+												zhttpd_log(LOG_ERROR, "CGI status header parsing failed!");
+												status_code = -1;
+											}
+										}
+										free(h_name);
+									}
+
+									http_response *resp = http_response_create((status_code != -1 ? status_code : 200));
+									resp->keep_alive = keep_conn_alive;
+									if (strcmp(req->method, "HEAD") == 0) resp->head_response = 1;	// This is a HEAD response
+									// Add headers to response
+									for (size_t i = 0; i < cgi_header_count; i++) {
+										http_header *h = cgi_headers[i];
+										char *h_name = string_to_lowercase(h->name);
+										if (strcmp(h_name, "status") != 0) {
+											http_response_add_header(resp, h);
+										}
 										free(h_name);
 										http_header_free(h);
 									}
