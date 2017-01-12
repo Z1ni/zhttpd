@@ -36,4 +36,10 @@
 #define ERROR_PATH_EXPLOITING -1	/**< User is trying to exploit file paths */
 #define ERROR_PATH_INVALID -2		/**< Invalid path */
 
+/**
+ * Errors for \ref exec_cgi
+ */
+#define ERROR_CGI_EXEC_FAILED -1		/**< CGI program execution failed */
+#define ERROR_CGI_STATUS_NONZERO -2		/**< CGI program executed, but with non-zero status. Output is provided */
+
 #endif

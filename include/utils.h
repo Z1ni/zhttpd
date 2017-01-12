@@ -60,6 +60,7 @@ int split_line2(const char *in, size_t in_len, char delim, char ***out, int limi
 void split_line_free(char **words, size_t len);
 
 char * string_to_lowercase(char *str);
+char * string_to_uppercase(char *str);
 
 int create_real_path(const char *webroot, size_t webroot_len, const char *path, size_t path_len, char **out);
 

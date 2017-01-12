@@ -241,6 +241,21 @@ char * string_to_lowercase(char *str) {
 }
 
 /**
+ * @brief Convert string to upper case
+ * @details Converts lower/mixed case string to upper case.
+ * 
+ * @param str String to convert
+ * @return Dynamically allocated string in upper case. User is responsible for freeing the memory.
+ */
+char * string_to_uppercase(char *str) {
+	char *out = calloc(strlen(str)+1, sizeof(char));
+	for (int i = 0; i < strlen(str); i++) {
+		out[i] = toupper(str[i]);
+	}
+	return out;
+}
+
+/**
  * @brief Create real filesystem path from webroot and request paths
  * @details Concatenates webroot and request paths securely
  * 

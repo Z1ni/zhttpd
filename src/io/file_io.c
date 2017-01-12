@@ -21,8 +21,8 @@ ssize_t read_file(const char *path, unsigned char **out) {
 			return ERROR_FILE_IO_NO_ENT;
 		}
 	}
-	size_t buf_size = 1024;
-	size_t final_cap = 1024;
+	size_t buf_size = 2048;
+	size_t final_cap = 2048;
 	size_t final_pos = 0;
 	unsigned char *buf = calloc(buf_size, sizeof(unsigned char));
 	unsigned char *final = calloc(final_cap, sizeof(unsigned char));

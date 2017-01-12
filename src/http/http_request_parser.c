@@ -1,16 +1,16 @@
 #include "http_request_parser.h"
 
 /**
- * @brief HTTP request parser
- * @details Parses raw text and produces \ref http_request
+ * @brief Parse HTTP request for header lines
+ * @details Parses HTTP request and splits headers to lines. Doesn't touch request payload.
  * 
  * @param request Raw request string
  * @param len Length of \p request
- * @param[out] out Unallocated memory for created request
- * @return 0 if successful, < 0 on error
+ * @param[out] header_lines Pointer to non-allocated memory that will contain pointers to header line strings
+ * @param[out] end_pos_out Pointer to the last character after header end
+ * @return Count of header lines or < 0 on error
  */
-int http_request_parse(const char *request, size_t len, http_request **out) {
-
+int http_request_parse_header_lines(const char *request, size_t len, char ***header_lines, char **end_pos_out) {
 	// Memory for lines
 	size_t lines_cap = 1;
 	size_t lines_count = 0;
@@ -20,7 +20,9 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 	size_t line_cap = 100;
 	size_t line_pos = 0;
 	char *line = calloc(line_cap, sizeof(char));
-	
+
+	char *end_pos = NULL;
+
 	// Parser state
 	int status = PARSER_STATUS_CHAR;
 
@@ -45,6 +47,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 					line = realloc(line, sizeof(char));
 					line[0] = '\0';
 					line_pos = 0;
+					end_pos = (char *)&request[i];
 					status = PARSER_STATUS_HEADER_END;
 				} else {
 					// Normal line ending with \r\n
@@ -60,6 +63,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 					line = realloc(line, sizeof(char));
 					line[0] = '\0';
 					line_pos = 0;
+					end_pos = (char *)&request[i];
 					status = PARSER_STATUS_HEADER_END;
 				} else {
 					// Normal line ending with \n
@@ -102,6 +106,86 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 		split_line_free(lines, lines_count);
 		zhttpd_log(LOG_WARN, "Possible request data exhaustion");
 		return ERROR_PARSER_GET_MORE_DATA;
+	}
+
+	*header_lines = lines;
+	if (end_pos_out != NULL) *end_pos_out = end_pos;
+
+	return lines_count;
+}
+
+int http_request_parse_headers(char **lines, size_t line_count, http_header ***out_headers) {
+
+	size_t header_cap = 1;
+	size_t header_count = 0;
+	http_header **headers = calloc(header_cap, sizeof(http_header *));
+
+	for (size_t i = 0; i < line_count; i++) {
+
+		if (i > 0 && (lines[i][0] == ' ' || lines[i][0] == '\t')) {
+			/* The parser has stumbled upon a folded header value
+			 * This has been obsoleted and must be responded with 400 Bad Request
+			 * For more information, see RFC 7230 Section 3.2.4.
+			 */
+			zhttpd_log(LOG_WARN, "Request contains folded headers, disallowed");
+			return ERROR_PARSER_MALFORMED_REQUEST;
+		}
+
+		// Split header line
+		char **header_words;
+		size_t header_words_count = split_line2(lines[i], strlen(lines[i]), ' ', &header_words, 1);
+
+		if (header_words_count != 2) {
+			// Invalid header
+			// TODO: Maybe ignore invalid headers?
+			zhttpd_log(LOG_WARN, "Invalid request header: %s", lines[i]);
+			split_line_free(header_words, header_words_count);
+			return ERROR_PARSER_MALFORMED_REQUEST;
+		}
+
+		char *header_name = header_words[0];
+		char *header_value = header_words[1];
+
+		if (header_name[strlen(header_name)-1] != ':') {
+			// Not valid header, header name must end with :
+			zhttpd_log(LOG_WARN, "Invalid request header name: \"%s\"", header_words[0]);
+			split_line_free(header_words, header_words_count);
+			return ERROR_PARSER_MALFORMED_REQUEST;
+		}
+		header_name[strlen(header_name)-1] = '\0';	// Remove trailing ':'
+
+		http_header *h = http_header_create(header_name, header_value);
+		if (header_cap < header_count+1) {
+			// Realloc
+			header_cap *= 2;
+			headers = realloc(headers, header_cap * sizeof(http_header *));
+		}
+		headers[header_count++] = h;
+
+		split_line_free(header_words, header_words_count);
+	}
+
+	*out_headers = headers;
+	return header_count;
+}
+
+/**
+ * @brief HTTP request parser
+ * @details Parses raw text and produces \ref http_request
+ * 
+ * @param request Raw request string
+ * @param len Length of \p request
+ * @param[out] out Unallocated memory for created request
+ * @return 0 if successful, < 0 on error
+ */
+int http_request_parse(const char *request, size_t len, http_request **out) {
+
+	char **lines;
+	size_t lines_count = 0;
+	lines_count = http_request_parse_header_lines(request, len, &lines, NULL);
+
+	if (lines_count < 0) {
+		return lines_count;	// Pass the error code
 	}
 
 	if (lines_count < 1) {
@@ -200,63 +284,25 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 		return ERROR_PARSER_MALFORMED_REQUEST;
 	}
 
-	int got_host_header = 0;
-	for (size_t i = 1; i < header_count+1; i++) {
-
-		if (i > 0 && (lines[i][0] == ' ' || lines[i][0] == '\t')) {
-			/* The parser has stumbled upon a folded header value
-			 * This has been obsoleted and must be responded with 400 Bad Request
-			 * For more information, see RFC 7230 Section 3.2.4.
-			 */
-			zhttpd_log(LOG_WARN, "Request contains folded headers, disallowed");
-			split_line_free(lines, lines_count);
-			http_request_free(req);
-			return ERROR_PARSER_MALFORMED_REQUEST;
-		}
-
-		// Split header line
-		char **header_words;
-		size_t header_words_count = split_line2(lines[i], strlen(lines[i]), ' ', &header_words, 1);
-		
-		if (header_words_count != 2) {
-			// Invalid header
-			// TODO: Maybe ignore invalid headers?
-			zhttpd_log(LOG_WARN, "Invalid request header: %s", lines[i]);
-			split_line_free(header_words, header_words_count);
-			split_line_free(lines, lines_count);
-			http_request_free(req);
-			return ERROR_PARSER_MALFORMED_REQUEST;
-		}
-
-		char *header_name = header_words[0];
-		char *header_value = header_words[1];
-
-		if (header_name[strlen(header_name)-1] != ':') {
-			// Not valid header, header name must end with :
-			zhttpd_log(LOG_WARN, "Invalid request header name: \"%s\"", header_words[0]);
-			split_line_free(header_words, header_words_count);
-			split_line_free(lines, lines_count);
-			http_request_free(req);
-			return ERROR_PARSER_MALFORMED_REQUEST;
-		}
-		header_name[strlen(header_name)-1] = '\0';	// Remove trailing ':'
-
-		if (strcmp(header_name, "Host") == 0) got_host_header = 1;
-
-		// Add header to the request
-		int header_add_ret = http_request_add_header2(req, header_name, header_value);
-		if (header_add_ret < 0) {
-			// Adding failed
-			// TODO: Maybe ignore error?
-			zhttpd_log(LOG_ERROR, "http_request_add_header2 failed: %d", header_add_ret);
-			split_line_free(header_words, header_words_count);
-			split_line_free(lines, lines_count);
-			http_request_free(req);
-			return header_add_ret;
-		}
-
-		split_line_free(header_words, header_words_count);
+	http_header **headers;
+	int got_header_count = http_request_parse_headers(&lines[1], header_count, &headers);
+	if (got_header_count < 0) {
+		split_line_free(lines, lines_count);
+		http_request_free(req);
+		return got_header_count;
 	}
+
+	// Check for Host header
+	int got_host_header = 0;
+	for (size_t i = 0; i < header_count; i++) {
+		http_header *h = headers[i];
+		http_request_add_header(req, h);
+		if (strcmp(h->name, "Host") == 0) {
+			got_host_header = 1;
+		}
+		http_header_free(h);
+	}
+	free(headers);
 
 	// Cleanup
 	split_line_free(lines, lines_count);

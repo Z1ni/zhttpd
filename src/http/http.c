@@ -173,10 +173,18 @@ int http_request_add_header2(http_request *req, char *header_name, char *header_
  * @return 1 if header exists, 0 otherwise
  */
 int http_request_header_exists(http_request *req, char *header_name) {
+	char *name = string_to_lowercase(header_name);
 	for (size_t i = 0; i < req->header_count; i++) {
 		http_header *h = req->headers[i];
-		if (strcmp(h->name, header_name) == 0) return 1;	// True
+		char *cur_name = string_to_lowercase(h->name);
+		if (strcmp(cur_name, name) == 0) {
+			free(cur_name);
+			free(name);
+			return 1;	// True
+		}
+		free(cur_name);
 	}
+	free(name);
 	return 0;	// False
 }
 
@@ -313,10 +321,18 @@ int http_response_add_header2(http_response *resp, char *header_name, char *head
  * @return 1 if header exists, 0 otherwise
  */
 int http_response_header_exists(http_response *resp, char *header_name) {
+	char *name = string_to_lowercase(header_name);
 	for (size_t i = 0; i < resp->header_count; i++) {
 		http_header *h = resp->headers[i];
-		if (strcmp(h->name, header_name) == 0) return 1;	// True
+		char *cur_name = string_to_lowercase(h->name);
+		if (strcmp(cur_name, name) == 0) {
+			free(cur_name);
+			free(name);
+			return 1;	// True
+		}
+		free(cur_name);
 	}
+	free(name);
 	return 0;	// False
 }
 

@@ -19,6 +19,7 @@ add_executable(${CMAKE_PROJECT_NAME}
 	src/http/http_request_parser.c
 
 	src/io/file_io.c
+	src/io/cgi.c
 )
 
 target_link_libraries(${CMAKE_PROJECT_NAME}
