@@ -267,6 +267,7 @@ http_response * http_response_create(unsigned int status) {
 	resp->_header_cap = 1;
 	resp->header_count = 0;
 	resp->keep_alive = 0;
+	resp->head_response = 0;
 	resp->headers = calloc(resp->_header_cap, sizeof(http_header*));
 
 	return resp;
@@ -515,11 +516,13 @@ int http_response_string(http_response *resp, char **out) {
 	}
 
 	// Add Content-Length
-	char *len_str = calloc(10, sizeof(char));
-	snprintf(len_str, 10, "%d", resp->content_length);
-	int cl_r = http_response_add_header2(resp, "Content-Length", len_str);
-	free(len_str);
-	if (cl_r < 0) return ERROR_RESPONSE_STRING_CREATE_FAILED;
+	if (resp->head_response == 0) {
+		char *len_str = calloc(10, sizeof(char));
+		snprintf(len_str, 10, "%d", resp->content_length);
+		int cl_r = http_response_add_header2(resp, "Content-Length", len_str);
+		free(len_str);
+		if (cl_r < 0) return ERROR_RESPONSE_STRING_CREATE_FAILED;
+	}
 
 	// Add Server
 	if (http_response_add_header2(resp, "Server", SERVER_IDENT) < 0) return ERROR_RESPONSE_STRING_CREATE_FAILED;
@@ -576,7 +579,7 @@ int http_response_string(http_response *resp, char **out) {
 	used += snprintf(&((*out)[used]), cap - used, "\r\n");
 
 	// Message body
-	if (resp->content_length > 0 && resp->content != NULL) {
+	if (resp->head_response == 0 && resp->content_length > 0 && resp->content != NULL) {
 		memcpy(&((*out)[used]), resp->content, resp->content_length);
 		used += resp->content_length;
 	}

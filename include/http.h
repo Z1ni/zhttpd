@@ -53,6 +53,7 @@ typedef struct {
 	size_t content_length;	/**< Content length in bytes */
 	unsigned char *content;	/**< Response content */
 	int keep_alive;			/**< Should the Connection header value be "keep-alive" */
+	int head_response;		/**< Should the response contain payload (0: yes, 1: no) */
 
 	size_t _header_cap;		/**< Header list capacity ("private") */
 } http_response;

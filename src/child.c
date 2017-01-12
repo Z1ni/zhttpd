@@ -44,6 +44,7 @@ static int sendall(int s, char *buf, int len) {
  */
 static int send_error_response(http_request *req, int sock, int status) {
 	http_response *resp = http_response_create(status);
+	if (strcmp(req->method, "HEAD") == 0) resp->head_response = 1;
 	if (req != NULL) {
 		resp->keep_alive = req->keep_alive;
 	} else {
@@ -261,7 +262,7 @@ void child_main_loop(int sock, pid_t parent_pid) {
 						}
 					}
 
-					if (strcmp(req->method, "GET") == 0 || strcmp(req->method, "POST") == 0) {
+					if (strcmp(req->method, "GET") == 0 || strcmp(req->method, "POST") == 0 || strcmp(req->method, "HEAD") == 0) {
 						// Concatenate file path and prevent free filesystem access
 						char *final_path;
 						int rp_ret = create_real_path(WEBROOT, strlen(WEBROOT), req->path, strlen(req->path), &final_path);
@@ -311,6 +312,7 @@ void child_main_loop(int sock, pid_t parent_pid) {
 									// Execution successful, send response
 									http_response *resp = http_response_create(200);
 									resp->keep_alive = keep_conn_alive;
+									if (strcmp(req->method, "HEAD") == 0) resp->head_response = 1;	// This is a HEAD response
 									// Set headers
 									int flags = CONTENT_SET_CONTENT_TYPE;
 									for (size_t i = 0; i < cgi_header_count; i++) {
@@ -361,6 +363,9 @@ void child_main_loop(int sock, pid_t parent_pid) {
 									keepalive_timer = time(NULL);	// TODO: Reset timer somewhere else?
 									http_response *resp = http_response_create(200);
 									resp->keep_alive = keep_conn_alive;
+									if (strcmp(req->method, "HEAD") == 0) resp->head_response = 1;	// This is a HEAD response
+
+									// Set content
 									// TODO: Do this somewhere else?
 									// TODO: Check case-insensitively
 									if (ext != NULL && strcmp(ext, "css") == 0) {
