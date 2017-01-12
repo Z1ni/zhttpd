@@ -16,12 +16,13 @@
 /**
  * Errors for \ref http_request_parse
  */
-#define ERROR_PARSER_MALFORMED_REQUEST -1		/**< Request is malformed */
-#define ERROR_PARSER_INVALID_METHOD -2			/**< Unknown method */
-#define ERROR_PARSER_URI_TOO_LONG -3			/**< URI is longer than 8000 characters */
-#define ERROR_PARSER_UNSUPPORTED_PROTOCOL -4	/**< Protocol is not HTTP/1.1 */
-#define ERROR_PARSER_NO_HOST_HEADER -5			/**< Missing Host header */
-#define ERROR_PARSER_GET_MORE_DATA -6			/**< Missing some data */
+#define ERROR_PARSER_MALFORMED_REQUEST -1			/**< Request is malformed */
+#define ERROR_PARSER_INVALID_METHOD -2				/**< Unknown method */
+#define ERROR_PARSER_URI_TOO_LONG -3				/**< URI is longer than 8000 characters */
+#define ERROR_PARSER_UNSUPPORTED_PROTOCOL -4		/**< Protocol is not HTTP/1.1 */
+#define ERROR_PARSER_NO_HOST_HEADER -5				/**< Missing Host header */
+#define ERROR_PARSER_GET_MORE_DATA -6				/**< Missing some data */
+#define ERROR_PARSER_UNSUPPORTED_FORM_ENCODING -7	/**< Unsupported form encoding, request is still returned */
 
 /**
  * Errors for \ref read_file

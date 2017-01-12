@@ -80,7 +80,9 @@ http_request * http_request_create() {
 	req->method = NULL;
 	req->path = NULL;
 	req->query_str = NULL;
+	req->payload = NULL;
 	req->header_count = 0;
+	req->payload_len = 0;
 	req->_header_cap = 1;
 	req->headers = calloc(req->_header_cap, sizeof(http_header*));
 	if (req->headers == NULL) {
@@ -112,7 +114,9 @@ http_request * http_request_create2(char *method, char *path, char *query) {
 	} else {
 		req->query_str = NULL;
 	}
+	req->payload = NULL;
 	req->header_count = 0;
+	req->payload_len = 0;
 	req->_header_cap = 1;
 	req->headers = calloc(req->_header_cap, sizeof(http_header*));
 
@@ -239,6 +243,7 @@ void http_request_free(http_request *req) {
 	if (req->method != NULL) free(req->method);
 	if (req->path != NULL) free(req->path);
 	if (req->query_str != NULL) free(req->query_str);
+	if (req->payload != NULL) free(req->payload);
 	// Free headers
 	for (size_t i = 0; i < req->header_count; i++) {
 		http_header_free(req->headers[i]);

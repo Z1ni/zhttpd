@@ -56,6 +56,12 @@ int cgi_exec(const char *path, cgi_parameters *params, unsigned char **out, http
 		// Set QUERY_STRING if it's provided
 		setenv("QUERY_STRING", params->req->query_str, 1);
 	}
+	if (params->req->payload_len > 0) {
+		char c_len_str[6] = {0};
+		snprintf(c_len_str, 6, "%d", params->req->payload_len);
+		setenv("CONTENT_LENGTH", c_len_str, 1);
+		setenv("CONTENT_TYPE", "application/x-www-form-urlencoded", 1);
+	}
 	setenv("REQUEST_METHOD", params->req->method, 1);
 	setenv("SERVER_SOFTWARE", SERVER_IDENT, 1);
 	setenv("SERVER_PORT", port_str, 1);
@@ -111,7 +117,8 @@ int cgi_exec(const char *path, cgi_parameters *params, unsigned char **out, http
 		// TODO: Check for errors
 		dup2(CHILD_READ_FD, STDIN_FILENO);
 		dup2(CHILD_WRITE_FD, STDOUT_FILENO);
-		dup2(CHILD_WRITE_FD, STDERR_FILENO);
+		// TODO: Redirect STDERR somewhere else
+		//dup2(CHILD_WRITE_FD, STDERR_FILENO);
 
 		close(CHILD_READ_FD);
 		close(CHILD_WRITE_FD);
@@ -138,8 +145,12 @@ int cgi_exec(const char *path, cgi_parameters *params, unsigned char **out, http
 		close(CHILD_READ_FD);
 		close(CHILD_WRITE_FD);
 
-		// TODO: Write possible (POST) parameters here
-		// write(PARENT_WRITE_FD, buf, buf_len);
+		// Write possible (POST) parameters
+		if (params->req->payload != NULL && params->req->payload_len > 0) {
+			// TODO: Ensure that all bytes are written
+			int w_res = write(PARENT_WRITE_FD, params->req->payload, params->req->payload_len);
+			zhttpd_log(LOG_DEBUG, "Wrote %d bytes to CGI program", w_res);
+		}
 
 		// Read stdout / stderr
 		char buf[2048] = {0};
@@ -147,9 +158,10 @@ int cgi_exec(const char *path, cgi_parameters *params, unsigned char **out, http
 		out_pos = 0;
 		size_t out_cap = 2048;
 		output = calloc(out_cap, sizeof(char));
-		
+
 		errno = 0;
 		while ((read_bytes = read(PARENT_READ_FD, buf, sizeof(buf))) > 0) {
+			zhttpd_log(LOG_DEBUG, "Got %d bytes", read_bytes);
 			while (out_cap < out_pos + read_bytes) {
 				out_cap *= 2;
 				output = realloc(output, out_cap * sizeof(char));
@@ -157,6 +169,7 @@ int cgi_exec(const char *path, cgi_parameters *params, unsigned char **out, http
 			memcpy(&output[out_pos], buf, read_bytes);
 			out_pos += read_bytes;
 		}
+		zhttpd_log(LOG_DEBUG, "All read");
 		close(PARENT_READ_FD);
 		close(PARENT_WRITE_FD);
 
@@ -171,7 +184,6 @@ int cgi_exec(const char *path, cgi_parameters *params, unsigned char **out, http
 		output[out_pos] = '\0';
 
 		zhttpd_log(LOG_DEBUG, "CGI program outputted %d bytes", out_pos);
-
 		// Output read, wait for program exit (probably has already)
 		while (!WIFEXITED(status) && !WIFSIGNALED(status)) {
 			waitpid(pid, &status, WUNTRACED);

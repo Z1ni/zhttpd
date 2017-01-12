@@ -37,6 +37,8 @@ typedef struct {
 	size_t header_count;		/**< Header count */
 	int keep_alive;				/**< Is the Connection header value "keep-alive" */
 	char *query_str;			/**< Query string */
+	char *payload;				/**< Possible payload data */
+	size_t payload_len;			/**< Payload data size */
 
 	size_t _header_cap;			/**< Header list capacity ("private") */
 } http_request;

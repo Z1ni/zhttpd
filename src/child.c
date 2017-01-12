@@ -228,6 +228,12 @@ void child_main_loop(int sock, pid_t parent_pid) {
 						} else if (ret == ERROR_PARSER_INVALID_METHOD) {
 							// Unsupported method
 							send_error_response(NULL, sock, 405);
+
+						} else if (ret == ERROR_PARSER_UNSUPPORTED_FORM_ENCODING) {
+							// Unsupported form encoding
+							http_request_free(req);	// Request is still set in this case
+							// Respond with "501 Not Implemented" for now
+							send_error_response(NULL, sock, 501);
 						}
 					}
 				} else {
@@ -255,7 +261,7 @@ void child_main_loop(int sock, pid_t parent_pid) {
 						}
 					}
 
-					if (strcmp(req->method, "GET") == 0) {
+					if (strcmp(req->method, "GET") == 0 || strcmp(req->method, "POST") == 0) {
 						// Concatenate file path and prevent free filesystem access
 						char *final_path;
 						int rp_ret = create_real_path(WEBROOT, strlen(WEBROOT), req->path, strlen(req->path), &final_path);

@@ -180,9 +180,10 @@ int http_request_parse_headers(char **lines, size_t line_count, http_header ***o
  */
 int http_request_parse(const char *request, size_t len, http_request **out) {
 
+	char *header_end_pos;
 	char **lines;
 	size_t lines_count = 0;
-	lines_count = http_request_parse_header_lines(request, len, &lines, NULL);
+	lines_count = http_request_parse_header_lines(request, len, &lines, &header_end_pos);
 
 	if (lines_count < 0) {
 		return lines_count;	// Pass the error code
@@ -317,6 +318,45 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 	
 	// TODO: Parse possible payload (in POST, etc.)
 	// TODO: Check if there's leftover data
+
+	int data_len = (int)(&request[len] - header_end_pos)-1;
+	if (data_len > 0) {
+		// header_end_pos points to '\r' or '\n', advance by one to get to the next
+		header_end_pos += 1;
+		zhttpd_log(LOG_DEBUG, "Request has leftover data (%d bytes)", data_len);
+
+		if (strcmp(req->method, "POST") == 0) {
+			// POST, get data
+			int is_form_urlencoded = 0;
+			for (size_t i = 0; i < req->header_count; i++) {
+				http_header *h = req->headers[i];
+				if (strcmp(h->name, "Content-Type") == 0) {
+					char *v = string_to_lowercase(h->value);
+					if (strcmp(v, "application/x-www-form-urlencoded") == 0) {
+						is_form_urlencoded = 1;
+						free(v);
+						break;
+					}
+					free(v);
+				}
+			}
+			if (is_form_urlencoded == 0) {
+				// Other form encodings not supported at this moment
+				*out = req;
+				return ERROR_PARSER_UNSUPPORTED_FORM_ENCODING;
+			}
+			// Decode data
+			char *decoded_data;
+			int decoded_data_len = url_decode(header_end_pos, data_len, &decoded_data);
+			if (decoded_data_len < 0) {
+				zhttpd_log(LOG_ERROR, "Decoding supplied form data failed!");
+			} else {
+				req->payload = decoded_data;
+				req->payload_len = decoded_data_len;
+			}
+
+		}
+	}
 
 	*out = req;
 
