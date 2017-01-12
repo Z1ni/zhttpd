@@ -19,6 +19,7 @@
 
 #define SERVER_IDENT "zhttpd/0.1-alpha"
 #define LISTEN_PORT 8080
+#define LISTEN_LIMIT 100
 #define MAX_EPOLL_EVENTS 64
 #define REQUEST_TIMEOUT_SECONDS 60	// For testing, normal value should be something like 10
 #define REQUEST_KEEPALIVE_TIMEOUT_SECONDS 10

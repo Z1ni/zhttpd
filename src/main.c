@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	if (listen(server_sock, 5) == -1) {
+	if (listen(server_sock, LISTEN_LIMIT) == -1) {
 		zhttpd_log(LOG_CRIT, "Connection listening failed!");
 		perror("Server listen");
 		exit(1);
