@@ -3,7 +3,9 @@ _simple (?) HTTP server in C_
 
 Works only with Linux >= 2.5.44.
 
-Currently supports only GET requests.
+Currently supports GET and POST requests **AND** CGI.
+
+CGI support works currently only with PHP5 (php5-cgi). If you want to run a PHP script, just point your browser to a PHP file.
 
 #### TODO:
 * Pretty much everything
@@ -11,8 +13,9 @@ Currently supports only GET requests.
 ### Requirements
 * cmake
 * gcc
-* doxygen (optional, for docs)
 * libmagic-dev
+* doxygen (optional, for docs)
+* php5-cgi ("optional", for CGI)
 
 ### Building & Running
 ```bash
