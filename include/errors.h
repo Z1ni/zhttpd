@@ -40,7 +40,9 @@
 /**
  * Errors for \ref exec_cgi
  */
-#define ERROR_CGI_EXEC_FAILED -1		/**< CGI program execution failed */
-#define ERROR_CGI_STATUS_NONZERO -2		/**< CGI program executed, but with non-zero status. Output is provided */
+#define ERROR_CGI_EXEC_FAILED -1			/**< CGI program execution failed */
+#define ERROR_CGI_STATUS_NONZERO -2			/**< CGI program executed, but with non-zero status. Output is provided */
+#define ERROR_CGI_PROG_PATH_INVALID -3		/**< CGI program path is invalid (file not found or path points to a directory) */
+#define ERROR_CGI_SCRIPT_PATH_INVALID -4	/**< CGI script path is invalid (file not found or path points to a directory) */
 
 #endif

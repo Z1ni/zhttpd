@@ -41,7 +41,39 @@ static int parse_headers(const char *in, size_t in_len, http_header ***out_heade
 int cgi_exec(const char *path, cgi_parameters *params, unsigned char **out, http_header ***out_headers, size_t *out_header_count) {
 
 	// TODO: Provide parameters in cgi_parameters
-	// TODO: Check if path points to existing file
+	// Check if path points to existing file
+	zhttpd_log(LOG_DEBUG, "Statting %s", path);
+	struct stat cgi_prog_stat;
+	errno = 0;
+	if (stat(path, &cgi_prog_stat) != 0) {
+		if (errno != ENOENT) {
+			zhttpd_log(LOG_ERROR, "CGI program path stat failed!");
+			perror("stat");
+			return ERROR_CGI_EXEC_FAILED;
+		}
+	}
+	if (errno == ENOENT || !S_ISREG(cgi_prog_stat.st_mode)) {
+		// CGI binary not found or not regular file
+		zhttpd_log(LOG_ERROR, "CGI program path invalid!");
+		perror("stat");
+		return ERROR_CGI_PROG_PATH_INVALID;
+	}
+
+	// Check if requested file exists
+	struct stat cgi_script_stat;
+	errno = 0;
+	if (stat(params->script_filename, &cgi_script_stat) != 0) {
+		if (errno != ENOENT) {
+			zhttpd_log(LOG_ERROR, "CGI script path stat failed!");
+			perror("stat");
+			return ERROR_CGI_EXEC_FAILED;
+		}
+	}
+	if (errno == ENOENT || !S_ISREG(cgi_script_stat.st_mode)) {
+		// CGI script not found or not regular file
+		zhttpd_log(LOG_WARN, "CGI script doesn't exist");
+		return ERROR_CGI_SCRIPT_PATH_INVALID;
+	}
 
 	// Convert numeric port to string
 	char port_str[6] = {0};

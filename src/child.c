@@ -296,11 +296,15 @@ void child_main_loop(int sock, pid_t parent_pid) {
 								size_t cgi_header_count;
 								int cgi_ret = cgi_exec("/usr/bin/php5-cgi", &params, &php_out, &cgi_headers, &cgi_header_count);
 
-								if (cgi_ret < 0 && cgi_ret != ERROR_CGI_STATUS_NONZERO) {
+								if (cgi_ret < 0 && cgi_ret != ERROR_CGI_STATUS_NONZERO && cgi_ret != ERROR_CGI_SCRIPT_PATH_INVALID) {
 									// Failed
 									zhttpd_log(LOG_ERROR, "PHP execution failed!");
 									// Send "500 Internal Server Error"
 									send_error_response(req, sock, 500);
+
+								} else if (cgi_ret == ERROR_CGI_SCRIPT_PATH_INVALID) {
+									// Script path invalid, send "404 Not Found"
+									send_error_response(req, sock, 404);
 
 								} else if (cgi_ret == ERROR_CGI_STATUS_NONZERO) {
 									// TODO: Handle non-zero status code
