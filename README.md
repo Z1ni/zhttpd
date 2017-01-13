@@ -3,7 +3,7 @@ _simple (?) HTTP server in C_
 
 Works only with Linux >= 2.5.44.
 
-Currently supports GET and POST requests **AND** CGI.
+Currently supports GET, POST and HEAD methods **AND** CGI. Supports simple caching by providing Last-Modified and handling If-Modified-Since.
 
 CGI support works currently only with PHP5 (php5-cgi). If you want to run a PHP script, just point your browser to a PHP file.
 
