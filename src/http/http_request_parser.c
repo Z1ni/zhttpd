@@ -316,9 +316,9 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 		return ERROR_PARSER_NO_HOST_HEADER;
 	}
 	
-	// TODO: Parse possible payload (in POST, etc.)
 	// TODO: Check if there's leftover data
 
+	// Parse possible payload (in POST, etc.)
 	int data_len = (int)(&request[len] - header_end_pos)-1;
 	if (data_len > 0) {
 		// header_end_pos points to '\r' or '\n', advance by one to get to the next

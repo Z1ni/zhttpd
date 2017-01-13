@@ -44,7 +44,8 @@ static int sendall(int s, char *buf, int len) {
  */
 static int send_error_response(http_request *req, int sock, int status) {
 	http_response *resp = http_response_create(status);
-	if (strcmp(req->method, "HEAD") == 0) resp->head_response = 1;
+	resp->method = strdup(req->method);
+	if (strcmp(req->method, "HEAD") == 0) resp->no_payload = 1;
 	if (req != NULL) {
 		resp->keep_alive = req->keep_alive;
 	} else {
@@ -337,8 +338,10 @@ void child_main_loop(int sock, pid_t parent_pid) {
 									}
 
 									http_response *resp = http_response_create((status_code != -1 ? status_code : 200));
+									resp->method = strdup(req->method);
 									resp->keep_alive = keep_conn_alive;
-									if (strcmp(req->method, "HEAD") == 0) resp->head_response = 1;	// This is a HEAD response
+									resp->fs_path = strdup(final_path);
+									if (strcmp(req->method, "HEAD") == 0) resp->no_payload = 1;	// This is a HEAD response
 									// Add headers to response
 									for (size_t i = 0; i < cgi_header_count; i++) {
 										http_header *h = cgi_headers[i];
@@ -385,9 +388,27 @@ void child_main_loop(int sock, pid_t parent_pid) {
 								} else {
 									// Got file, send response
 									keepalive_timer = time(NULL);	// TODO: Reset timer somewhere else?
+
 									http_response *resp = http_response_create(200);
+									resp->method = strdup(req->method);
 									resp->keep_alive = keep_conn_alive;
-									if (strcmp(req->method, "HEAD") == 0) resp->head_response = 1;	// This is a HEAD response
+									resp->fs_path = strdup(final_path);
+									if (strcmp(req->method, "HEAD") == 0) resp->no_payload = 1;	// This is a HEAD response
+
+									// Check if the request contains If-Modified-Since
+									for (size_t i = 0; i < req->header_count; i++) {
+										http_header *h = req->headers[i];
+										if (strcmp(h->name, "If-Modified-Since") == 0) {
+											struct tm if_mod_since_tm;
+											if (strptime(h->value, HTTP_DATE_FORMAT, &if_mod_since_tm) == NULL) {
+												// strptime failed
+												zhttpd_log(LOG_ERROR, "If-Modified-Since date parsing failed!");
+											} else {
+												// strptime succeeded
+												resp->if_mod_since_time = timegm(&if_mod_since_tm);
+											}
+										}
+									}
 
 									// Set content
 									// TODO: Do this somewhere else?

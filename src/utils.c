@@ -125,7 +125,7 @@ int current_datetime_string2(char **str, const char *format) {
  * @return Length of \p str or < 0 on error
  */
 int current_datetime_string(char **str) {
-	return current_datetime_string2(str, "%a, %d %b %Y %H:%M:%S %Z");
+	return current_datetime_string2(str, HTTP_DATE_FORMAT);
 }
 
 /**
@@ -305,12 +305,14 @@ int create_real_path(const char *webroot, size_t webroot_len, const char *path, 
 		prev = c;
 	}
 
-	// Check if real_path is pointing to a directory
-	struct stat path_stat;
-	stat(real_path, &path_stat);
-	if (stat(real_path, &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
-		// Is directory, append '/'
-		real_path[real_path_pos++] = '/';
+	// Check if real_path is pointing to a directory and has no trailing slash
+	if (real_path[real_path_pos-1] != '/') {
+		struct stat path_stat;
+		stat(real_path, &path_stat);
+		if (stat(real_path, &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
+			// Is directory, append '/'
+			real_path[real_path_pos++] = '/';
+		}
 	}
 
 	// If the path ends with '/', add "index.html"

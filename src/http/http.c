@@ -7,6 +7,7 @@ http_status_entry status_entries[] = {
 	{200, "OK",                    NULL},
 	{500, "Internal Server Error", "Unknown server error."},
 	{501, "Not Implemented",       "Sorry, the server doesn't know how to handle the request."},
+	{304, "Not Modified",          "The resource hasn't been modified since given date."},
 	{400, "Bad Request",           "Received request was malformed."},
 	{403, "Forbidden",             "File access forbidden."},
 	{404, "Not Found",             "Requested file not found."},
@@ -261,13 +262,16 @@ void http_request_free(http_request *req) {
  */
 http_response * http_response_create(unsigned int status) {
 	http_response *resp = calloc(1, sizeof(http_response));
+	resp->method = NULL;
+	resp->fs_path = NULL;
 	resp->status = status;
 	resp->content_length = 0;
 	resp->content = NULL;
 	resp->_header_cap = 1;
 	resp->header_count = 0;
 	resp->keep_alive = 0;
-	resp->head_response = 0;
+	resp->no_payload = 0;
+	resp->if_mod_since_time = 0;
 	resp->headers = calloc(resp->_header_cap, sizeof(http_header*));
 
 	return resp;
@@ -454,6 +458,8 @@ int http_response_set_content(http_response *resp, unsigned const char *content,
  */
 void http_response_free(http_response *resp) {
 	if (resp == NULL) return;
+	if (resp->method != NULL) free(resp->method);
+	if (resp->fs_path != NULL) free(resp->fs_path);
 	if (resp->content != NULL) free(resp->content);
 	// Free headers
 	for (size_t i = 0; i < resp->header_count; i++) {
@@ -515,8 +521,50 @@ int http_response_string(http_response *resp, char **out) {
 		reason = "OK";
 	}
 
+	time_t last_mtime = -1;
+	struct tm *last_mtime_tm = NULL;
+	// Get file mtime
+	struct stat f_stat;
+	if (resp->fs_path != NULL && stat(resp->fs_path, &f_stat) == 0) {
+		last_mtime = f_stat.st_mtime;
+		last_mtime_tm = gmtime(&last_mtime);
+	}
+
+	// Check if the request had If-Modified-Since (only check if using GET or HEAD)
+	if ((strcmp(resp->method, "GET") == 0 || strcmp(resp->method, "POST") == 0) &&
+		resp->if_mod_since_time > 0 && resp->fs_path != NULL) {
+
+		double diff = difftime(last_mtime, resp->if_mod_since_time);
+		if (diff <= 0) {
+			// File hasn't been modified since given date
+			// Respond with "304 Not Modified" without response body
+			status_entry = http_status_get_entry(304);
+			reason = status_entry->reason;
+			code = 304;
+			resp->no_payload = 1;	// Don't add message body
+		}
+	}
+
+	// Add Last-Modified
+	if (http_response_header_exists(resp, "Last-Modified") == 0 && resp->fs_path != NULL) {
+		// No header, add
+		if (last_mtime_tm != NULL) {
+			// Create "HTTP-date"
+			char http_date[60];
+			if (strftime(http_date, 60, HTTP_DATE_FORMAT, last_mtime_tm) < 0) {
+				zhttpd_log(LOG_ERROR, "Response Last-Modified strftime failed!");
+				perror("strftime");
+			} else {
+				// Success
+				if (http_response_add_header2(resp, "Last-Modified", http_date) < 0) {
+					zhttpd_log(LOG_ERROR, "Response Last-Modified header addition failed!");
+				}
+			}
+		}
+	}
+
 	// Add Content-Length
-	if (resp->head_response == 0) {
+	if (resp->no_payload == 0) {
 		char *len_str = calloc(10, sizeof(char));
 		snprintf(len_str, 10, "%d", resp->content_length);
 		int cl_r = http_response_add_header2(resp, "Content-Length", len_str);
@@ -579,7 +627,7 @@ int http_response_string(http_response *resp, char **out) {
 	used += snprintf(&((*out)[used]), cap - used, "\r\n");
 
 	// Message body
-	if (resp->head_response == 0 && resp->content_length > 0 && resp->content != NULL) {
+	if (resp->no_payload == 0 && resp->content_length > 0 && resp->content != NULL) {
 		memcpy(&((*out)[used]), resp->content, resp->content_length);
 		used += resp->content_length;
 	}

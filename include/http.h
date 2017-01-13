@@ -47,13 +47,16 @@ typedef struct {
  * \struct HTTP Response
  */
 typedef struct {
-	unsigned int status;	/**< Numeric status code (e.g. 200, 404, 500, ...) */
-	http_header **headers;	/**< List of headers */
-	size_t header_count;	/**< Header count */
-	size_t content_length;	/**< Content length in bytes */
-	unsigned char *content;	/**< Response content */
-	int keep_alive;			/**< Should the Connection header value be "keep-alive" */
-	int head_response;		/**< Should the response contain payload (0: yes, 1: no) */
+	char *method;				/**< Request method */
+	char *fs_path;				/**< Possible requested file absolute filesystem path */
+	unsigned int status;		/**< Numeric status code (e.g. 200, 404, 500, ...) */
+	http_header **headers;		/**< List of headers */
+	size_t header_count;		/**< Header count */
+	size_t content_length;		/**< Content length in bytes */
+	unsigned char *content;		/**< Response content */
+	int keep_alive;				/**< Should the Connection header value be "keep-alive" */
+	int no_payload;				/**< Should the response contain payload (0: yes, 1: no) */
+	time_t if_mod_since_time;	/**< Timestamp provided by possible If-Modified-Since header */
 
 	size_t _header_cap;		/**< Header list capacity ("private") */
 } http_response;

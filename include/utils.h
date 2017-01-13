@@ -25,6 +25,8 @@
 #define REQUEST_KEEPALIVE_TIMEOUT_SECONDS 10
 #define WEBROOT "/var/www-zhttpd/"
 
+#define HTTP_DATE_FORMAT "%a, %d %b %Y %H:%M:%S %Z"
+
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
 #define ANSI_COLOR_YELLOW  "\x1b[33m"
