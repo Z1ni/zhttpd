@@ -217,9 +217,9 @@ int cgi_exec(const char *path, cgi_parameters *params, unsigned char **out, http
 
 		zhttpd_log(LOG_DEBUG, "CGI program outputted %d bytes", out_pos);
 		// Output read, wait for program exit (probably has already)
-		while (!WIFEXITED(status) && !WIFSIGNALED(status)) {
+		do {
 			waitpid(pid, &status, WUNTRACED);
-		}
+		} while (!WIFEXITED(status) && !WIFSIGNALED(status));
 		zhttpd_log(LOG_INFO, "CGI program exited with status code %d", status);
 	}
 
