@@ -40,7 +40,7 @@
 // Utility ====================================================================
 
 /**
- * \enum Log levels
+ * Log levels
  */
 typedef enum {
 	LOG_CRIT,	/**< Critical, program can't recover */

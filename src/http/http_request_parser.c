@@ -114,6 +114,15 @@ int http_request_parse_header_lines(const char *request, size_t len, char ***hea
 	return lines_count;
 }
 
+/**
+ * @brief Parse lines to array of \ref http_header
+ * @details Parses given array of lines to array of \ef http_header
+ * 
+ * @param lines Pointer to array produced by \ref http_request_parse_header_lines
+ * @param line_count Count of lines in \p lines
+ * @param[out] out_headers Pointer to non-allocated memory that will contain the array of \ref http_header
+ * @return Count of parsed headers or < 0 on error
+ */
 int http_request_parse_headers(char **lines, size_t line_count, http_header ***out_headers) {
 
 	size_t header_cap = 1;

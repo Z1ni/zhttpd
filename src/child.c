@@ -264,7 +264,7 @@ static void handle_http_request(http_request *req) {
  * @brief Child process main loop
  * @details Reads data from given socket and handles and responds to requests.
  * 
- * @param sock Socket to monitor
+ * @param in_sock Socket to monitor
  * @param parent_pid Process ID of the parent process
  */
 void child_main_loop(int in_sock, pid_t parent_pid) {

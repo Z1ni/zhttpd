@@ -13,14 +13,14 @@
 #define METHOD_POST "POST"
 
 /**
- * \enum Flags for http_response_set_content2()
+ * Flags for http_response_set_content2()
  */
 enum SET_CONTENT_FLAGS {
 	CONTENT_SET_CONTENT_TYPE = 1	/**< Automatically set Content-Type */
 };
 
 /**
- * \struct HTTP Header
+ * HTTP Header
  */
 typedef struct {
 	char *name;		/**< Header name/key */
@@ -28,7 +28,7 @@ typedef struct {
 } http_header;
 
 /**
- * \struct HTTP Request
+ * HTTP Request
  */
 typedef struct {
 	char *method;				/**< Method (e.g. GET, POST, PUT, ...) */
@@ -44,7 +44,7 @@ typedef struct {
 } http_request;
 
 /**
- * \struct HTTP Response
+ * HTTP Response
  */
 typedef struct {
 	char *method;				/**< Request method */
@@ -58,11 +58,11 @@ typedef struct {
 	int no_payload;				/**< Should the response contain payload (0: yes, 1: no) */
 	time_t if_mod_since_time;	/**< Timestamp provided by possible If-Modified-Since header */
 
-	size_t _header_cap;		/**< Header list capacity ("private") */
+	size_t _header_cap;			/**< Header list capacity ("private") */
 } http_response;
 
 /**
- * \struct HTTP status list entry
+ * HTTP status list entry
  */
 typedef struct {
 	unsigned int status;	/**< Status code */

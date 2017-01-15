@@ -9,7 +9,7 @@
 #include "http.h"
 
 /**
- * \enum HTTP Parser status
+ * HTTP Parser status
  */
 typedef enum {
 	PARSER_STATUS_CHAR,			/**< Current position contains character */
