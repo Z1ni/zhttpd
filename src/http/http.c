@@ -169,6 +169,41 @@ int http_request_add_header2(http_request *req, char *header_name, char *header_
 }
 
 /**
+ * @brief Get header from request
+ * @details Gets header with given name from the given request. Case insensitive.
+ * 
+ * @param req Request to use
+ * @param header_name Header name, case insensitive
+ * 
+ * @return Pointer to the header or NULL if not found
+ */
+http_header * http_request_get_header(http_request *req, char *header_name) {
+	http_header *h_tmp = NULL;
+	// Convert "needle" name to lowercase
+	char *header_name_needle_lower = string_to_lowercase(header_name);
+	// Loop through headers
+	for (size_t i = 0; i < req->header_count; i++) {
+		http_header *h = req->headers[i];
+		// Convert current header name to lowercase
+		char *header_name_lower = string_to_lowercase(h->name);
+		if (strcmp(header_name_needle_lower, header_name_lower) == 0) {
+			// Found
+			h_tmp = h;
+			free(header_name_lower);
+			break;
+		}
+		free(header_name_lower);
+	}
+	free(header_name_needle_lower);
+	if (h_tmp != NULL) {
+		// Header found, return
+		return h_tmp;
+	}
+	// No match
+	return NULL;
+}
+
+/**
  * @brief Check if request contains header
  * @details Checks existence of header with given name
  * 
@@ -319,6 +354,41 @@ int http_response_add_header2(http_response *resp, char *header_name, char *head
 	int ret = http_response_add_header(resp, header);
 	http_header_free(header);
 	return ret;
+}
+
+/**
+ * @brief Get header from response
+ * @details Gets header with given name from the given response. Case insensitive.
+ * 
+ * @param resp Response to use
+ * @param header_name Header name, case insensitive
+ * 
+ * @return Pointer to the header or NULL if not found
+ */
+http_header * http_response_get_header(http_response *resp, char *header_name) {
+	http_header *h_tmp = NULL;
+	// Convert "needle" name to lowercase
+	char *header_name_needle_lower = string_to_lowercase(header_name);
+	// Loop through headers
+	for (size_t i = 0; i < resp->header_count; i++) {
+		http_header *h = resp->headers[i];
+		// Convert current header name to lowercase
+		char *header_name_lower = string_to_lowercase(h->name);
+		if (strcmp(header_name_needle_lower, header_name_lower) == 0) {
+			// Found
+			h_tmp = h;
+			free(header_name_lower);
+			break;
+		}
+		free(header_name_lower);
+	}
+	free(header_name_needle_lower);
+	if (h_tmp != NULL) {
+		// Header found, return
+		return h_tmp;
+	}
+	// No match
+	return NULL;
 }
 
 /**

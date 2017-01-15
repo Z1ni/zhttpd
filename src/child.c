@@ -211,7 +211,9 @@ void child_main_loop(int sock, pid_t parent_pid) {
 
 				// Receiving ends
 				// Handle final received data here ================================================
-				
+
+				keepalive_timer = time(NULL);	// TODO: Reset timer somewhere else?
+
 				http_request *req;
 				int ret = http_request_parse(received, got_bytes, &req);
 				if (ret < 0) {
@@ -249,18 +251,16 @@ void child_main_loop(int sock, pid_t parent_pid) {
 						zhttpd_log(LOG_DEBUG, "    %s: \"%s\"", h->name, h->value);
 					}
 
-					for (size_t i = 0; i < req->header_count; i++) {
-						http_header *h = req->headers[i];
-						if (strcmp(h->name, "Connection") == 0) {
-							char *value = string_to_lowercase(h->value);
-							if (strcmp(value, "keep-alive") == 0) {
-								keep_conn_alive = 1;	// Set to true
-								req->keep_alive = 1;
-							}
-							free(value);
-							if (keep_conn_alive) zhttpd_log(LOG_DEBUG, "Client wants to keep connection alive");
-							break;
+					// Search for Connection header to possibly set keep-alive
+					http_header *conn_h = http_request_get_header(req, "Connection");
+					if (conn_h != NULL) {
+						char *value = string_to_lowercase(conn_h->value);
+						if (strcmp(value, "keep-alive") == 0) {
+							keep_conn_alive = 1;	// Set to true
+							req->keep_alive = 1;
 						}
+						free(value);
+						if (keep_conn_alive) zhttpd_log(LOG_DEBUG, "Client wants to keep connection alive");
 					}
 
 					if (strcmp(req->method, "GET") == 0 || strcmp(req->method, "POST") == 0 || strcmp(req->method, "HEAD") == 0) {
@@ -285,7 +285,6 @@ void child_main_loop(int sock, pid_t parent_pid) {
 
 							if (ext != NULL && strcmp(ext, "php") == 0) {
 								// Run PHP script
-								// TODO: Check if the file really exists
 								zhttpd_log(LOG_INFO, "File is runnable PHP file!");
 
 								cgi_parameters params = {
@@ -318,6 +317,7 @@ void child_main_loop(int sock, pid_t parent_pid) {
 									// Set headers
 									int flags = CONTENT_SET_CONTENT_TYPE;
 									int status_code = -1;
+
 									for (size_t i = 0; i < cgi_header_count; i++) {
 										http_header *h = cgi_headers[i];
 										char *h_name = string_to_lowercase(h->name);
@@ -387,7 +387,6 @@ void child_main_loop(int sock, pid_t parent_pid) {
 									}
 								} else {
 									// Got file, send response
-									keepalive_timer = time(NULL);	// TODO: Reset timer somewhere else?
 
 									http_response *resp = http_response_create(200);
 									resp->method = strdup(req->method);
@@ -396,17 +395,16 @@ void child_main_loop(int sock, pid_t parent_pid) {
 									if (strcmp(req->method, "HEAD") == 0) resp->no_payload = 1;	// This is a HEAD response
 
 									// Check if the request contains If-Modified-Since
-									for (size_t i = 0; i < req->header_count; i++) {
-										http_header *h = req->headers[i];
-										if (strcmp(h->name, "If-Modified-Since") == 0) {
-											struct tm if_mod_since_tm;
-											if (strptime(h->value, HTTP_DATE_FORMAT, &if_mod_since_tm) == NULL) {
-												// strptime failed
-												zhttpd_log(LOG_ERROR, "If-Modified-Since date parsing failed!");
-											} else {
-												// strptime succeeded
-												resp->if_mod_since_time = timegm(&if_mod_since_tm);
-											}
+									http_header *if_mod_since_h = http_request_get_header(req, "If-Modified-Since");
+									if (if_mod_since_h != NULL) {
+										// Convert textual time representation to time_t
+										struct tm if_mod_since_tm;
+										if (strptime(if_mod_since_h->value, HTTP_DATE_FORMAT, &if_mod_since_tm) == NULL) {
+											// strptime failed
+											zhttpd_log(LOG_ERROR, "If-Modified-Since date parsing failed!");
+										} else {
+											// strptime succeeded
+											resp->if_mod_since_time = timegm(&if_mod_since_tm);
 										}
 									}
 
@@ -431,6 +429,7 @@ void child_main_loop(int sock, pid_t parent_pid) {
 									}
 									http_response_free(resp);
 									free(file_data);
+									keepalive_timer = time(NULL);	// TODO: Reset timer somewhere else?
 								}
 							}
 
@@ -438,7 +437,7 @@ void child_main_loop(int sock, pid_t parent_pid) {
 						}
 
 					} else {
-						// Only GET is supported at this moment
+						// Not supported method
 						// Send "501 Not Implemented"
 						send_error_response(req, sock, 501);
 					}
