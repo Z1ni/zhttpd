@@ -53,7 +53,7 @@ static void reset_keepalive_timer(void) {
 static int send_error_response(http_request *req, int sock, int status) {
 	http_response *resp = http_response_create(status);
 	resp->method = strdup(req->method);
-	if (strcmp(req->method, "HEAD") == 0) resp->no_payload = 1;
+	if (strcmp(req->method, METHOD_HEAD) == 0) resp->no_payload = 1;
 	if (req != NULL) {
 		resp->keep_alive = req->keep_alive;
 	} else {
@@ -80,7 +80,7 @@ static void handle_http_request(http_request *req) {
 
 	// Check for supported method
 	char *m = req->method;
-	if (strcmp(m, "GET") != 0 && strcmp(m, "POST") != 0 && strcmp(m, "HEAD") != 0) {
+	if (strcmp(m, METHOD_GET) != 0 && strcmp(m, METHOD_POST) != 0 && strcmp(m, METHOD_HEAD) != 0) {
 		// Not supported method
 		// Send "501 Not Implemented"
 		send_error_response(req, sock, 501);
@@ -164,7 +164,7 @@ static void handle_http_request(http_request *req) {
 				resp->method = strdup(req->method);
 				resp->keep_alive = keep_conn_alive;
 				resp->fs_path = strdup(final_path);
-				if (strcmp(req->method, "HEAD") == 0) resp->no_payload = 1;	// This is a HEAD response
+				if (strcmp(req->method, METHOD_HEAD) == 0) resp->no_payload = 1;	// This is a HEAD response
 				// Add headers to response
 				for (size_t i = 0; i < cgi_header_count; i++) {
 					http_header *h = cgi_headers[i];
@@ -217,7 +217,7 @@ static void handle_http_request(http_request *req) {
 			resp->method = strdup(req->method);
 			resp->keep_alive = keep_conn_alive;
 			resp->fs_path = strdup(final_path);
-			if (strcmp(req->method, "HEAD") == 0) resp->no_payload = 1;	// This is a HEAD response
+			if (strcmp(req->method, METHOD_HEAD) == 0) resp->no_payload = 1;	// This is a HEAD response
 
 			// Check if the request contains If-Modified-Since
 			http_header *if_mod_since_h = http_request_get_header(req, "If-Modified-Since");

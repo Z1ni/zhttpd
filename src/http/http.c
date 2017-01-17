@@ -602,7 +602,7 @@ int http_response_string(http_response *resp, char **out) {
 	}
 
 	// Check if the request had If-Modified-Since (only check if using GET or HEAD)
-	if ((strcmp(resp->method, "GET") == 0 || strcmp(resp->method, "POST") == 0) &&
+	if ((strcmp(resp->method, METHOD_GET) == 0 || strcmp(resp->method, METHOD_POST) == 0) &&
 		resp->if_mod_since_time > 0 && resp->fs_path != NULL) {
 
 		double diff = difftime(last_mtime, resp->if_mod_since_time);

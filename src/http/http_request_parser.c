@@ -226,8 +226,8 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 	// First the request must contain the method
 
 	// Check if the given method is valid
-	if (strcmp(method, "GET") != 0 && strcmp(method, "HEAD") != 0 && strcmp(method, "POST") != 0 && strcmp(method, "PUT") != 0 &&
-		strcmp(method, "DELETE") != 0 && strcmp(method, "CONNECT") != 0 && strcmp(method, "OPTIONS") != 0 && strcmp(method, "TRACE") != 0) {
+	if (strcmp(method, METHOD_GET) != 0 && strcmp(method, METHOD_HEAD) != 0 && strcmp(method, METHOD_POST) != 0 && strcmp(method, METHOD_PUT) != 0 &&
+		strcmp(method, METHOD_DELETE) != 0 && strcmp(method, METHOD_CONNECT) != 0 && strcmp(method, METHOD_OPTIONS) != 0 && strcmp(method, METHOD_TRACE) != 0) {
 		// Not valid method
 		zhttpd_log(LOG_WARN, "Invalid request method %s", method);
 		split_line_free(words, word_count);
@@ -334,7 +334,7 @@ int http_request_parse(const char *request, size_t len, http_request **out) {
 		header_end_pos += 1;
 		zhttpd_log(LOG_DEBUG, "Request has leftover data (%d bytes)", data_len);
 
-		if (strcmp(req->method, "POST") == 0) {
+		if (strcmp(req->method, METHOD_POST) == 0) {
 			// POST, get data
 			int is_form_urlencoded = 0;
 			for (size_t i = 0; i < req->header_count; i++) {
