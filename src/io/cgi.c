@@ -81,6 +81,21 @@ int cgi_exec(const char *path, cgi_parameters *params, unsigned char **out, http
 	char port_str[6] = {0};
 	snprintf(port_str, 6, "%d", LISTEN_PORT);
 
+	// Clear environment variables
+	if (clearenv() != 0) {
+		/* TODO: On error just return 501?
+		 *       Leaking general shell environment variables to PHP scripts and
+		 *       possibly to the Internet is probably a bad idea.
+		 */
+		zhttpd_log(LOG_WARN, "Couldn't clear environment variables!");
+	}
+	// Set up basic environment
+	setenv("PATH", "/usr/local/bin:/usr/bin:/bin", 1);
+	setenv("LANG", "C", 1);
+	setenv("PWD", WEBROOT, 1);
+
+	// TODO: Get & set REMOTE_ADDR
+
 	// Setup environment variables
 	setenv("GATEWAY_INTERFACE", "CGI/1.1", 1);
 	setenv("SCRIPT_FILENAME", params->script_filename, 1);
@@ -119,7 +134,7 @@ int cgi_exec(const char *path, cgi_parameters *params, unsigned char **out, http
 		while ((dash_p = strstr(env_name, "-")) != NULL) {
 			*dash_p = '_';
 		}
-		setenv(env_name, h->value, 1);
+		setenv(env_name, h->value, 0);
 		free(env_name);
 	}
 
