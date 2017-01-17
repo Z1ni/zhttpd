@@ -7,6 +7,7 @@ http_status_entry status_entries[] = {
 	{200, "OK",                    NULL},
 	{500, "Internal Server Error", "Unknown server error."},
 	{501, "Not Implemented",       "Sorry, the server doesn't know how to handle the request."},
+	{302, "Moved Temporarily",     "The resource has been moved temporarily to another location."},
 	{304, "Not Modified",          "The resource hasn't been modified since given date."},
 	{400, "Bad Request",           "Received request was malformed."},
 	{403, "Forbidden",             "File access forbidden."},

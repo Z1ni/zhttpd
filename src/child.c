@@ -439,6 +439,9 @@ void child_main_loop(int in_sock, pid_t parent_pid) {
 
 						} else if (ret == ERROR_PARSER_UNSUPPORTED_FORM_ENCODING) {
 							// Unsupported form encoding
+							http_header *cont_type_h = http_request_get_header(req, "Content-Type");
+							char *form_encoding = cont_type_h->value;
+							zhttpd_log(LOG_WARN, "Request is using unsupported form encoding \"%s\"!", form_encoding);
 							http_request_free(req);	// Request is still set in this case
 							// Respond with "501 Not Implemented" for now
 							send_error_response(NULL, sock, 501);
