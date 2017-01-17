@@ -75,6 +75,8 @@ int cgi_exec(const char *path, cgi_parameters *params, unsigned char **out, http
 		return ERROR_CGI_SCRIPT_PATH_INVALID;
 	}
 
+	zhttpd_log(LOG_DEBUG, "Setting up CGI environment");
+
 	// Convert numeric port to string
 	char port_str[6] = {0};
 	snprintf(port_str, 6, "%d", LISTEN_PORT);
@@ -126,7 +128,7 @@ int cgi_exec(const char *path, cgi_parameters *params, unsigned char **out, http
 	 * (so no writing and reading at the same time)
 	 */
 
-	// TODO: Process execution timeout (e.g. 60 seconds)
+	zhttpd_log(LOG_DEBUG, "Starting CGI program");
 
 	int pipes[2][2];
 
@@ -177,6 +179,23 @@ int cgi_exec(const char *path, cgi_parameters *params, unsigned char **out, http
 		close(CHILD_READ_FD);
 		close(CHILD_WRITE_FD);
 
+		/* Use fcntl to set the O_NONBLOCK flag to make the file descriptor
+		 * non-blocking. The naming of this function is a bit misleading. */
+		// TODO: Rename make_socket_nonblocking
+		if (make_socket_nonblocking(PARENT_READ_FD) == -1) {
+			// Failed
+			close(PARENT_READ_FD);
+			close(PARENT_WRITE_FD);
+			zhttpd_log(LOG_ERROR, "Couldn't make CGI parent read file descriptor non-blocking!");
+			// Ask the CGI process to shut down
+			if (kill(pid, SIGTERM) == -1) {
+				// Failed!
+				zhttpd_log(LOG_ERROR, "Couldn't send SIGTERM to CGI process %d!", pid);
+				perror("kill");
+			}
+			return ERROR_CGI_EXEC_FAILED;
+		}
+
 		// Write possible (POST) parameters
 		if (params->req->payload != NULL && params->req->payload_len > 0) {
 			// TODO: Ensure that all bytes are written
@@ -190,28 +209,55 @@ int cgi_exec(const char *path, cgi_parameters *params, unsigned char **out, http
 		out_pos = 0;
 		size_t out_cap = 2048;
 		output = calloc(out_cap, sizeof(char));
+		int read_cgi_data = 1;
+		time_t cgi_data_read_start = time(NULL);	// Start time
 
-		errno = 0;
-		while ((read_bytes = read(PARENT_READ_FD, buf, sizeof(buf))) > 0) {
-			zhttpd_log(LOG_DEBUG, "Got %d bytes", read_bytes);
-			while (out_cap < out_pos + read_bytes) {
-				out_cap *= 2;
-				output = realloc(output, out_cap * sizeof(char));
+		zhttpd_log(LOG_DEBUG, "Reading CGI output");
+
+		while (read_cgi_data) {
+			errno = 0;
+			read_bytes = read(PARENT_READ_FD, buf, sizeof(buf));
+			if (read_bytes == 0) {
+				// EOF, stop reading
+				zhttpd_log(LOG_DEBUG, "CGI program output EOF");
+				read_cgi_data = 0;
 			}
-			memcpy(&output[out_pos], buf, read_bytes);
-			out_pos += read_bytes;
+			if (read_bytes == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
+				// Error, other than EAGAIN or EWOULDBLOCK
+				zhttpd_log(LOG_ERROR, "CGI program output read failed!");
+				perror("read");
+				free(output);
+				close(PARENT_READ_FD);
+				close(PARENT_WRITE_FD);
+				return ERROR_CGI_EXEC_FAILED;
+			}
+
+			if (read_bytes > 0) {
+				// Read OK
+				//zhttpd_log(LOG_DEBUG, "Read %d bytes", read_bytes);
+				while (out_cap < out_pos + read_bytes) {
+					out_cap *= 2;
+					output = realloc(output, out_cap * sizeof(char));
+				}
+				memcpy(&output[out_pos], buf, read_bytes);
+				out_pos += read_bytes;
+			}
+
+			if (read_cgi_data && time(NULL) - cgi_data_read_start >= CGI_READ_TIMEOUT_SECONDS) {
+				zhttpd_log(LOG_ERROR, "CGI data read timeout!");
+				free(output);
+				close(PARENT_READ_FD);
+				close(PARENT_WRITE_FD);
+				return ERROR_CGI_EXEC_FAILED;
+			}
+
+			usleep(5000);	// 5 ms
 		}
+
 		zhttpd_log(LOG_DEBUG, "All read");
 		close(PARENT_READ_FD);
 		close(PARENT_WRITE_FD);
 
-		if (errno != 0) {
-			// Read failed
-			zhttpd_log(LOG_ERROR, "CGI program output read failed!");
-			perror("read");
-			free(output);
-			return ERROR_CGI_EXEC_FAILED;
-		}
 		output = realloc(output, (out_pos+1) * sizeof(char));
 		output[out_pos] = '\0';
 
