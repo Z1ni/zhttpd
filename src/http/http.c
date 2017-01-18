@@ -541,15 +541,15 @@ void http_response_free(http_response *resp) {
 }
 
 /**
- * @brief Create response string
- * @details Creates raw response string for sending to the socket
+ * @brief Create response start
+ * @details Outputs HTTP status line and headers
  * 
  * @param resp Response to use
- * @param[out] out Non-allocated pointer where the result will be written
+ * @param[out] out Pointer to non-allocated memory where the result string will be stored
  * 
- * @return Length of \p out or < 0 if an error occurred
+ * @return Length of \p out or < 0 on error
  */
-int http_response_string(http_response *resp, char **out) {
+int http_response_get_start_string(http_response *resp, char **out) {
 	if (resp == NULL) return ERROR_RESPONSE_ARGUMENT;
 	
 	// Handle status code
@@ -634,8 +634,8 @@ int http_response_string(http_response *resp, char **out) {
 		}
 	}
 
-	// Add Content-Length
-	if (resp->no_payload == 0) {
+	// Add Content-Length if needed
+	if (http_response_header_exists(resp, "Content-Length") == 0 && resp->no_payload == 0) {
 		char *len_str = calloc(10, sizeof(char));
 		snprintf(len_str, 10, "%d", resp->content_length);
 		int cl_r = http_response_add_header2(resp, "Content-Length", len_str);
@@ -660,7 +660,7 @@ int http_response_string(http_response *resp, char **out) {
 	}
 
 	// Add Content-Type if needed
-	if (http_response_header_exists(resp, "Content-Type") == 0) {
+	if (http_response_header_exists(resp, "Content-Type") == 0 && resp->content != NULL) {
 		// No header, add
 		char *content_type;
 		if (libmagic_get_mimetype(resp->content, resp->content_length, &content_type) < 0) {
@@ -697,15 +697,40 @@ int http_response_string(http_response *resp, char **out) {
 	}
 	used += snprintf(&((*out)[used]), cap - used, "\r\n");
 
-	// Message body
-	if (resp->no_payload == 0 && resp->content_length > 0 && resp->content != NULL) {
-		memcpy(&((*out)[used]), resp->content, resp->content_length);
-		used += resp->content_length;
-	}
-	
 	// Realloc to fit
 	*out = realloc((*out), (used+1) * sizeof(char));
 	(*out)[used] = '\0';	// Null byte
+
+	return used;
+}
+
+/**
+ * @brief Create response string
+ * @details Creates raw response string for sending to the socket
+ * 
+ * @param resp Response to use
+ * @param[out] out Non-allocated pointer where the result will be written
+ * 
+ * @return Length of \p out or < 0 if an error occurred
+ */
+int http_response_string(http_response *resp, char **out) {
+
+	char *tmp_out;
+	int used = http_response_get_start_string(resp, &tmp_out);
+	if (used < 0) {
+		return used;
+	}
+
+	tmp_out = realloc(tmp_out, (used+resp->content_length+1) * sizeof(char));
+	tmp_out[used] = '\0';	// Null byte
+
+	// Message body
+	if (resp->no_payload == 0 && resp->content_length > 0 && resp->content != NULL) {
+		memcpy(&(tmp_out[used]), resp->content, resp->content_length);
+		used += resp->content_length;
+	}
+
+	*out = tmp_out;
 
 	return used;
 }

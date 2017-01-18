@@ -60,3 +60,30 @@ ssize_t read_file(const char *path, unsigned char **out) {
 
 	return final_pos;
 }
+
+/**
+ * @brief Get file size
+ * @details Gets file size in bytes
+ * 
+ * @param path File path
+ * @param[out] file_size Pointer to memory address that will contain the file size
+ * 
+ * @return 0 on success, < 0 on error
+ */
+int get_file_size(const char *path, off_t *file_size) {
+	struct stat file_stat;
+	errno = 0;
+	if (stat(path, &file_stat) == -1) {
+		if (errno == EACCES) {
+			return ERROR_FILE_IO_NO_ACCESS;
+		} else if (errno == ENOENT) {
+			return ERROR_FILE_IO_NO_ENT;
+		}
+		// Stat failed
+		zhttpd_log(LOG_ERROR, "get_file_size stat failed!");
+		perror("stat");
+		return ERROR_FILE_IO_GENERAL;
+	}
+	*file_size = file_stat.st_size;
+	return 0;
+}

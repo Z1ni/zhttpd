@@ -383,6 +383,54 @@ int libmagic_get_mimetype(const unsigned char *buf, size_t buf_len, char **out) 
 }
 
 /**
+ * @brief Get mimetype & charset string from file
+ * @details Uses libmagic to obtain mimetype and charset for given file path
+ * 
+ * @param path File path to check
+ * @param[out] out Pointer to non-allocated memory that will contain the mimetype & charset string
+ * 
+ * @return 0 on success, < 0 on error
+ */
+int libmagic_get_mimetype2(const char *path, char **out) {
+
+	char *desc_out;
+
+	magic_t lm = magic_open(MAGIC_MIME_TYPE | MAGIC_MIME_ENCODING | MAGIC_NO_CHECK_COMPRESS | MAGIC_NO_CHECK_TAR | MAGIC_NO_CHECK_ELF | MAGIC_NO_CHECK_TOKENS | MAGIC_NO_CHECK_TROFF);
+	if (lm == NULL) {
+		zhttpd_log(LOG_ERROR, "Libmagic open failed: %s", magic_error(lm));
+		return -1;
+	}
+	if (magic_load(lm, NULL) == 1) {
+		zhttpd_log(LOG_ERROR, "Libmagic load failed: %s", magic_error(lm));
+		magic_close(lm);
+		return -1;
+	}
+
+	const char *desc = magic_file(lm, path);
+	if (desc == NULL) {
+		zhttpd_log(LOG_ERROR, "Libmagic file detect failed: %s", magic_error(lm));
+		magic_close(lm);
+		return -1;
+	}
+	desc_out = strdup(desc);
+
+	magic_close(lm);
+
+	// Remove "charset=binary" if needed
+	char *p = strstr(desc_out, "; charset=binary");
+	if (p != NULL) {
+		*p = '\0';
+		// "Realloc"
+		char *tmp = strdup(desc_out);
+		free(desc_out);
+		desc_out = tmp;
+	}
+
+	*out = desc_out;
+	return 0;
+}
+
+/**
  * @brief URL decode
  * @details Decode URL-encoded text
  * 

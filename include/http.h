@@ -121,6 +121,7 @@ int http_response_set_content2(http_response *resp, unsigned const char *content
 
 void http_response_free(http_response *resp);
 
+int http_response_get_start_string(http_response *resp, char **out);
 int http_response_string(http_response *resp, char **out);
 
 

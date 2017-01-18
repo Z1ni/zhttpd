@@ -193,31 +193,58 @@ static void handle_http_request(http_request *req) {
 
 		} else {
 
-			unsigned char *file_data;
-			ssize_t file_bytes = read_file(final_path, &file_data);
-			if (file_bytes < 0) {
-				if (file_bytes == ERROR_FILE_IO_NO_ACCESS) {
+			off_t file_size;
+			int size_ret = get_file_size(final_path, &file_size);
+			if (size_ret < 0) {
+				free(final_path);
+				// Error
+				if (size_ret == ERROR_FILE_IO_NO_ACCESS) {
 					// Respond with "403 Forbidden"
 					send_error_response(req, sock, 403);
 
-				} else if (file_bytes == ERROR_FILE_IO_NO_ENT) {
+				} else if (size_ret == ERROR_FILE_IO_NO_ENT) {
 					// File not found, respond with "404 File Not Found"
 					send_error_response(req, sock, 404);
 
-				} else if (file_bytes == ERROR_FILE_IO_GENERAL) {
+				} else if (size_ret == ERROR_FILE_IO_GENERAL) {
 					// I/O error, response with "500 Internal Server Error"
 					send_error_response(req, sock, 500);
 				}
 				return;
 			}
 
-			// Got file, send response
+			zhttpd_log(LOG_DEBUG, "File size: %lu bytes", file_size);
 
 			http_response *resp = http_response_create(200);
 			resp->method = strdup(req->method);
 			resp->keep_alive = keep_conn_alive;
 			resp->fs_path = strdup(final_path);
 			if (strcmp(req->method, METHOD_HEAD) == 0) resp->no_payload = 1;	// This is a HEAD response
+
+			// Set Content-Length
+			char cont_len_str[20] = {0};
+			snprintf(cont_len_str, 20, "%lu", file_size);
+			http_response_add_header2(resp, "Content-Length", cont_len_str);
+
+			// Set Content-Type
+			// TODO: Check case-insensitively
+			if (ext != NULL && strcmp(ext, "css") == 0) {
+				http_response_add_header2(resp, "Content-Type", "text/css");
+			} else {
+				// Guess Content-Type
+				char *cont_type;
+				if (libmagic_get_mimetype2(final_path, &cont_type) == -1) {
+					// Failed
+					zhttpd_log(LOG_ERROR, "Content-Type guessing failed!");
+					http_response_free(resp);
+					// Send "500 Internal Server Error"
+					send_error_response(req, sock, 500);
+					return;
+				}
+				// Set Content-Type
+				http_response_add_header2(resp, "Content-Type", cont_type);
+				free(cont_type);
+			}
 
 			// Check if the request contains If-Modified-Since
 			http_header *if_mod_since_h = http_request_get_header(req, "If-Modified-Since");
@@ -233,27 +260,40 @@ static void handle_http_request(http_request *req) {
 				}
 			}
 
-			// Set content
-			// TODO: Do this somewhere else?
-			// TODO: Check case-insensitively
-			if (ext != NULL && strcmp(ext, "css") == 0) {
-				http_response_add_header2(resp, "Content-Type", "text/css");
-				http_response_set_content(resp, file_data, file_bytes);
-			} else {
-				// Guess Content-Type
-				http_response_set_content2(resp, file_data, file_bytes, CONTENT_SET_CONTENT_TYPE);
+			char *resp_start_str;
+			int len = http_response_get_start_string(resp, &resp_start_str);
+
+			if (sendall(sock, resp_start_str, len) == -1) {
+				// Send failed
+				zhttpd_log(LOG_ERROR, "Response sending failed!");
+				perror("sendall");
 			}
-			char *resp_str;
-			int len = http_response_string(resp, &resp_str);
-			if (len >= 0) {
-				if (sendall(sock, resp_str, len) == -1) {
-					zhttpd_log(LOG_ERROR, "Response sending failed!");
-					perror("sendall");
+			free(resp_start_str);
+
+			// Send possible content
+			if (resp->no_payload == 0) {
+
+				// Read file in chunks
+				// TODO: Move this to http.c ?
+				FILE *f = fopen(final_path, "r");
+				char buf[2048] = {0};
+				int read_bytes = 0;
+				while ((read_bytes = fread(buf, sizeof(char), 2048, f)) > 0) {
+					if (sendall(sock, buf, read_bytes) == -1) {
+						zhttpd_log(LOG_ERROR, "Response sending failed!");
+						perror("file sendall");
+						break;
+					}
 				}
-				free(resp_str);
+				if (feof(f) == 0 && ferror(f) != 0) {
+					// Error
+					zhttpd_log(LOG_ERROR, "File reading failed!");
+					perror("fread");
+				}
+				fclose(f);
+
 			}
 			http_response_free(resp);
-			free(file_data);
 		}
 
 		free(final_path);
