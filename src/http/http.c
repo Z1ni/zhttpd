@@ -575,14 +575,14 @@ int http_response_get_start_string(http_response *resp, char **out) {
 	if (code != 200) {
 		char *resp_html;
 		int c_len = asprintf(&resp_html,
-			"<html><head>\n \
+			"<!DOCTYPE html><html><head>\n \
 			<title>%d %s</title>\n \
-			</head></body>\n \
-			<h1>%s</h1>\n \
-			<p>%s<br />\n</p>\n \
+			</head><body>\n \
+			<h1>%d %s</h1>\n \
+			<p>%s<br /></p>\n \
 			<hr>\n \
-			<address>%s on port %d</address>\r\n</body></html>\n",
-			code, reason, reason, err_msg, SERVER_IDENT, LISTEN_PORT
+			<address>%s on port %d</address>\n</body></html>\n",
+			code, reason, code, reason, err_msg, SERVER_IDENT, LISTEN_PORT
 		);
 		http_response_set_content(resp, (unsigned char *)resp_html, c_len);
 		free(resp_html);
