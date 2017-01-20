@@ -306,8 +306,9 @@ static void handle_http_request(http_request *req) {
  * 
  * @param in_sock Socket to monitor
  * @param parent_pid Process ID of the parent process
+ * @param addr_str Textual representation of client address (IPv4 or IPv6)
  */
-void child_main_loop(int in_sock, pid_t parent_pid) {
+void child_main_loop(int in_sock, pid_t parent_pid, const char *addr_str) {
 
 	sock = in_sock;	// Set global socket variable
 

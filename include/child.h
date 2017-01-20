@@ -14,6 +14,6 @@
 #include <signal.h>
 #include <sys/prctl.h>
 
-void child_main_loop(int sock, pid_t parent_pid);
+void child_main_loop(int sock, pid_t parent_pid, const char *addr_str);
 
 #endif
