@@ -637,7 +637,7 @@ int http_response_get_start_string(http_response *resp, char **out) {
 	// Add Content-Length if needed
 	if (http_response_header_exists(resp, "Content-Length") == 0 && resp->no_payload == 0) {
 		char *len_str = calloc(10, sizeof(char));
-		snprintf(len_str, 10, "%d", resp->content_length);
+		snprintf(len_str, 10, "%lu", resp->content_length);
 		int cl_r = http_response_add_header2(resp, "Content-Length", len_str);
 		free(len_str);
 		if (cl_r < 0) return ERROR_RESPONSE_STRING_CREATE_FAILED;
