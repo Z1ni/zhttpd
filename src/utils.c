@@ -1,5 +1,12 @@
 #include "utils.h"
 
+static const char *index_names[] = {
+	"index.html",
+	"index.htm",
+	"index.php",
+	NULL	// Guard entry, must be last
+};
+
 /**
  * @brief Log strings to stdout
  * @details Logs formatted and possibly colored strings to stdout.
@@ -267,7 +274,6 @@ char * string_to_uppercase(char *str) {
  * @return Length of the concatenated path or < 0 on error
  */
 int create_real_path(const char *webroot, size_t webroot_len, const char *path, size_t path_len, char **out) {
-	size_t real_path_cap = webroot_len + path_len;
 	char *real_path = calloc(webroot_len + path_len + 1, sizeof(char));
 	size_t real_path_pos = 0;
 	memcpy(real_path, webroot, webroot_len);
@@ -318,11 +324,41 @@ int create_real_path(const char *webroot, size_t webroot_len, const char *path, 
 	// If the path ends with '/', add "index.html"
 	// TODO: Select between "index.htm" and "index.html", etc.
 	if (real_path[real_path_pos-1] == '/') {
-		if (real_path_cap < real_path_pos + 10) {
-			real_path = realloc(real_path, (real_path_pos + 10) * sizeof(char));
+
+		int found_index_file = 0;
+		int idx_name_id = 0;
+		while (1) {
+			const char *idx_name = index_names[idx_name_id++];
+			if (idx_name == NULL) break;
+			int idx_name_len = strlen(idx_name);
+
+			char *test_path = calloc(real_path_pos + idx_name_len + 1, sizeof(char));
+			memcpy(test_path, real_path, real_path_pos);
+			memcpy(&test_path[real_path_pos], idx_name, idx_name_len);
+
+			struct stat idx_stat;
+			errno = 0;
+			if (stat(test_path, &idx_stat) == -1) {
+				if (errno != ENOENT) {
+					zhttpd_log(LOG_ERROR, "Can't stat \"%s\"", test_path);
+					perror("stat");
+				}
+			} else {
+				if (S_ISREG(idx_stat.st_mode)) {
+					// Is regular file
+					free(real_path);
+					real_path = test_path;
+					real_path_pos += idx_name_len;
+					found_index_file = 1;
+					break;
+				}
+			}
+			free(test_path);
 		}
-		memcpy(&real_path[real_path_pos], "index.html", 10 * sizeof(char));
-		real_path_pos += 10;
+
+		if (found_index_file == 0) {
+			zhttpd_log(LOG_WARN, "No index file found");
+		}
 	}
 
 	// Realloc

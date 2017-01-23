@@ -202,7 +202,7 @@ static void handle_http_request(http_request *req) {
 					// Respond with "403 Forbidden"
 					send_error_response(req, sock, 403);
 
-				} else if (size_ret == ERROR_FILE_IO_NO_ENT) {
+				} else if (size_ret == ERROR_FILE_IO_NO_ENT || size_ret == ERROR_FILE_IS_DIR) {
 					// File not found, respond with "404 File Not Found"
 					send_error_response(req, sock, 404);
 
@@ -228,7 +228,9 @@ static void handle_http_request(http_request *req) {
 
 			// Set Content-Type
 			// TODO: Check case-insensitively
-			if (ext != NULL && strcmp(ext, "css") == 0) {
+			if (ext != NULL && (strcmp(ext, "html") == 0 || strcmp(ext, "htm") == 0)) {
+				http_response_add_header2(resp, "Content-Type", "text/html");
+			} else if (ext != NULL && strcmp(ext, "css") == 0) {
 				http_response_add_header2(resp, "Content-Type", "text/css");
 			} else {
 				// Guess Content-Type

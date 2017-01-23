@@ -22,6 +22,7 @@
 #define ERROR_FILE_IO_NO_ACCESS -1	/**< File access denied */
 #define ERROR_FILE_IO_NO_ENT -2		/**< File doesn't exist */
 #define ERROR_FILE_IO_GENERAL -3	/**< General I/O error */
+#define ERROR_FILE_IS_DIR -4		/**< Is directory */
 
 // Errors for create_real_path()
 #define ERROR_PATH_EXPLOITING -1	/**< User is trying to exploit file paths */

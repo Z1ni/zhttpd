@@ -84,6 +84,9 @@ int get_file_size(const char *path, off_t *file_size) {
 		perror("stat");
 		return ERROR_FILE_IO_GENERAL;
 	}
+	if (S_ISDIR(file_stat.st_mode)) {
+		return ERROR_FILE_IS_DIR;
+	}
 	*file_size = file_stat.st_size;
 	return 0;
 }
