@@ -101,6 +101,35 @@ int make_socket_nonblocking(int sockfd) {
 	return 0;
 }
 
+// Basically copied from http://beej.us/guide/bgnet/output/html/singlepage/bgnet.html#sendall
+/**
+ * @brief Send all given data to socket
+ * @details Send all given data to socket
+ * 
+ * @param s Socket
+ * @param buf Buffer to send
+ * @param len Length of \p buf
+ * @return Sent bytes count or -1 on error
+ */
+int sendall(int s, char *buf, int len) {
+	int total = 0;
+	int bytes_left = len;
+	int n = 0;
+
+	while (total < len) {
+		n = send(s, buf+total, bytes_left, 0);
+		if (n == -1 && errno != EWOULDBLOCK && errno != EAGAIN) {
+			// Send failed
+			break;
+		}
+		total += n;
+		bytes_left -= n;
+		usleep(100);
+	}
+
+	return n == -1 ? -1 : total;
+}
+
 /**
  * @brief Get current date/time string
  * @details Produces string with given strftime() format.

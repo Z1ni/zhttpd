@@ -107,7 +107,7 @@ int cgi_exec(const char *path, cgi_parameters *params, unsigned char **out, http
 	}
 	if (params->req->payload_len > 0) {
 		char c_len_str[10] = {0};
-		snprintf(c_len_str, 10, "%lu", params->req->payload_len);
+		snprintf(c_len_str, 10, "%u", params->req->payload_len);
 		setenv("CONTENT_LENGTH", c_len_str, 1);
 		setenv("CONTENT_TYPE", "application/x-www-form-urlencoded", 1);
 	}

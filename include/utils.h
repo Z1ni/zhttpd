@@ -12,6 +12,8 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 
 #include <magic.h>
 
@@ -56,6 +58,8 @@ typedef enum {
 void zhttpd_log(LOG_LEVEL level, const char *format, ...);
 
 int make_socket_nonblocking(int sockfd);
+
+int sendall(int s, char *buf, int len);
 
 int current_datetime_string(char **out);
 int current_datetime_string2(char **out, const char *format);

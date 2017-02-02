@@ -178,7 +178,7 @@ int main(int argc, char *argv[]) {
 				close(cli_sock);
 			}
 		}
-		usleep(5000);
+		usleep(5000);	// TODO: Use epoll instead
 	}
 
 	shutdown(server_sock, SHUT_RDWR);

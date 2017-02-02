@@ -17,73 +17,26 @@ static void sigint_handler(int signal) {
 	run_child_main_loop = 0;
 }
 
-// Basically copied from http://beej.us/guide/bgnet/output/html/singlepage/bgnet.html#sendall
-static int sendall(int s, char *buf, int len) {
-	int total = 0;
-	int bytes_left = len;
-	int n;
-
-	while (total < len) {
-		n = send(s, buf+total, bytes_left, 0);
-		if (n == -1 && errno != EWOULDBLOCK && errno != EAGAIN) {
-			// Send failed
-			break;
-		}
-		total += n;
-		bytes_left -= n;
-		usleep(100);
-	}
-
-	return n == -1 ? -1 : total;
-}
-
 static void reset_keepalive_timer(void) {
 	keepalive_timer = time(NULL);
-}
-
-/**
- * @brief Send HTTP response with given status code
- * @details Sends HTTP response with given non-OK (200) status code
- * 
- * @param req Request
- * @param sock Socket
- * @param status HTTP status code
- * @return Sent byte count on success or < 0 on error
- */
-static int send_error_response(http_request *req, int sock, int status) {
-	http_response *resp = http_response_create(status);
-	resp->method = strdup(req->method);
-	if (strcmp(req->method, METHOD_HEAD) == 0) resp->no_payload = 1;
-	if (req != NULL) {
-		resp->keep_alive = req->keep_alive;
-	} else {
-		resp->keep_alive = 0;
-	}
-	char *resp_str;
-	int len = http_response_string(resp, &resp_str);
-	int write_res = 0;
-	if (len >= 0) {
-		write_res = sendall(sock, resp_str, len);
-		free(resp_str);
-	}
-	http_response_free(resp);
-	return write_res;
 }
 
 /**
  * @brief Handle HTTP request
  * @details Handles given HTTP request and responds to it
  * 
- * @param req Request to handle
+ * @param ctx HTTP Context
  */
-static void handle_http_request(http_request *req) {
+static void handle_http_request(http_context *ctx) {
+
+	http_request *req = ctx->request;
 
 	// Check for supported method
 	char *m = req->method;
 	if (strcmp(m, METHOD_GET) != 0 && strcmp(m, METHOD_POST) != 0 && strcmp(m, METHOD_HEAD) != 0) {
 		// Not supported method
 		// Send "501 Not Implemented"
-		send_error_response(req, sock, 501);
+		send_error_response(ctx, 501);
 		return;
 	}
 
@@ -92,11 +45,13 @@ static void handle_http_request(http_request *req) {
 	int rp_ret = create_real_path(WEBROOT, strlen(WEBROOT), req->path, strlen(req->path), &final_path);
 	if (rp_ret < 0) {
 		// Invalid path, send "400 Bad Request"
-		send_error_response(req, sock, 400);
+		send_error_response(ctx, 400);
 
 	} else {
 		// Valid path
 		zhttpd_log(LOG_INFO, "Client requests file: \"%s\"", final_path);
+
+		ctx->file_path = final_path;
 
 		// Get file extension
 		char *ext = NULL;
@@ -123,17 +78,17 @@ static void handle_http_request(http_request *req) {
 				// Failed
 				zhttpd_log(LOG_ERROR, "PHP execution failed!");
 				// Send "500 Internal Server Error"
-				send_error_response(req, sock, 500);
+				send_error_response(ctx, 500);
 
 			} else if (cgi_ret == ERROR_CGI_SCRIPT_PATH_INVALID) {
 				// Script path invalid, send "404 Not Found"
-				send_error_response(req, sock, 404);
+				send_error_response(ctx, 404);
 
 			} else if (cgi_ret == ERROR_CGI_STATUS_NONZERO) {
 				// TODO: Handle non-zero status code
 				// For now just send "500 Internal Server Error" instead
 				free(php_out);
-				send_error_response(req, sock, 500);
+				send_error_response(ctx, 500);
 
 			} else {
 				// Execution successful, send response
@@ -200,15 +155,15 @@ static void handle_http_request(http_request *req) {
 				// Error
 				if (size_ret == ERROR_FILE_IO_NO_ACCESS) {
 					// Respond with "403 Forbidden"
-					send_error_response(req, sock, 403);
+					send_error_response(ctx, 403);
 
 				} else if (size_ret == ERROR_FILE_IO_NO_ENT || size_ret == ERROR_FILE_IS_DIR) {
 					// File not found, respond with "404 File Not Found"
-					send_error_response(req, sock, 404);
+					send_error_response(ctx, 404);
 
 				} else if (size_ret == ERROR_FILE_IO_GENERAL) {
 					// I/O error, response with "500 Internal Server Error"
-					send_error_response(req, sock, 500);
+					send_error_response(ctx, 500);
 				}
 				return;
 			}
@@ -220,11 +175,6 @@ static void handle_http_request(http_request *req) {
 			resp->keep_alive = keep_conn_alive;
 			resp->fs_path = strdup(final_path);
 			if (strcmp(req->method, METHOD_HEAD) == 0) resp->no_payload = 1;	// This is a HEAD response
-
-			// Set Content-Length
-			char cont_len_str[20] = {0};
-			snprintf(cont_len_str, 20, "%lu", file_size);
-			http_response_add_header2(resp, "Content-Length", cont_len_str);
 
 			// Set Content-Type
 			// TODO: Check case-insensitively
@@ -240,7 +190,7 @@ static void handle_http_request(http_request *req) {
 					zhttpd_log(LOG_ERROR, "Content-Type guessing failed!");
 					http_response_free(resp);
 					// Send "500 Internal Server Error"
-					send_error_response(req, sock, 500);
+					send_error_response(ctx, 500);
 					return;
 				}
 				// Set Content-Type
@@ -248,53 +198,10 @@ static void handle_http_request(http_request *req) {
 				free(cont_type);
 			}
 
-			// Check if the request contains If-Modified-Since
-			http_header *if_mod_since_h = http_request_get_header(req, "If-Modified-Since");
-			if (if_mod_since_h != NULL) {
-				// Convert textual time representation to time_t
-				struct tm if_mod_since_tm;
-				if (strptime(if_mod_since_h->value, HTTP_DATE_FORMAT, &if_mod_since_tm) == NULL) {
-					// strptime failed
-					zhttpd_log(LOG_ERROR, "If-Modified-Since date parsing failed!");
-				} else {
-					// strptime succeeded
-					resp->if_mod_since_time = timegm(&if_mod_since_tm);
-				}
-			}
+			ctx->response = resp;
 
-			char *resp_start_str;
-			int len = http_response_get_start_string(resp, &resp_start_str);
+			http_response_serve_file(ctx);
 
-			if (sendall(sock, resp_start_str, len) == -1) {
-				// Send failed
-				zhttpd_log(LOG_ERROR, "Response sending failed!");
-				perror("sendall");
-			}
-			free(resp_start_str);
-
-			// Send possible content
-			if (resp->no_payload == 0) {
-
-				// Read file in chunks
-				// TODO: Move this to http.c ?
-				FILE *f = fopen(final_path, "r");
-				char buf[2048] = {0};
-				int read_bytes = 0;
-				while ((read_bytes = fread(buf, sizeof(char), 2048, f)) > 0) {
-					if (sendall(sock, buf, read_bytes) == -1) {
-						zhttpd_log(LOG_ERROR, "Response sending failed!");
-						perror("file sendall");
-						break;
-					}
-				}
-				if (feof(f) == 0 && ferror(f) != 0) {
-					// Error
-					zhttpd_log(LOG_ERROR, "File reading failed!");
-					perror("fread");
-				}
-				fclose(f);
-
-			}
 			http_response_free(resp);
 		}
 
@@ -373,7 +280,7 @@ void child_main_loop(int in_sock, pid_t parent_pid, const char *addr_str) {
 	}
 
 	int handled = 0;			// False
-	int request_num = 1;		// True
+	int request_num = 1;
 	int recv_timer_started = 1;	// True
 
 	// Main event loop
@@ -384,6 +291,11 @@ void child_main_loop(int in_sock, pid_t parent_pid, const char *addr_str) {
 	unsigned int recv_buf_size = buf_size;
 
 	char *received = calloc(recv_buf_size, sizeof(char));
+
+	// Create HTTP Context
+	http_context context;
+	memset(&context, 0, sizeof(http_context));
+	context._sock = sock;
 
 	while (run_child_main_loop) {
 
@@ -474,11 +386,11 @@ void child_main_loop(int in_sock, pid_t parent_pid, const char *addr_str) {
 						zhttpd_log(LOG_ERROR, "Request parsing failed with error code %d", ret);
 						if (ret == ERROR_PARSER_MALFORMED_REQUEST || ret == ERROR_PARSER_NO_HOST_HEADER) {
 							// Malformed request or HTTP/1.1 request without Host header
-							send_error_response(NULL, sock, 400);
+							send_error_response(&context, 400);
 
 						} else if (ret == ERROR_PARSER_INVALID_METHOD) {
 							// Unsupported method
-							send_error_response(NULL, sock, 405);
+							send_error_response(&context, 405);
 
 						} else if (ret == ERROR_PARSER_UNSUPPORTED_FORM_ENCODING) {
 							// Unsupported form encoding
@@ -487,14 +399,15 @@ void child_main_loop(int in_sock, pid_t parent_pid, const char *addr_str) {
 							zhttpd_log(LOG_WARN, "Request is using unsupported form encoding \"%s\"!", form_encoding);
 							http_request_free(req);	// Request is still set in this case
 							// Respond with "501 Not Implemented" for now
-							send_error_response(NULL, sock, 501);
+							send_error_response(&context, 501);
 						}
 					}
 
 				} else {
 					// Request parsing successful!
+					context.request = req;	// Set context request
 
-					zhttpd_log(LOG_DEBUG, "New HTTP request:");
+					zhttpd_log(LOG_DEBUG, "New HTTP request (No. %d):", request_num);
 					zhttpd_log(LOG_DEBUG, "  Method: %s", req->method);
 					zhttpd_log(LOG_DEBUG, "  Path: %s", req->path);
 					if (req->query_str != NULL) zhttpd_log(LOG_DEBUG, "  Query: %s", req->query_str);
@@ -520,7 +433,7 @@ void child_main_loop(int in_sock, pid_t parent_pid, const char *addr_str) {
 					}
 
 					// Handle the request and respond to it
-					handle_http_request(req);
+					handle_http_request(&context);
 
 					// We're done with the request, free it
 					http_request_free(req);
@@ -551,7 +464,7 @@ void child_main_loop(int in_sock, pid_t parent_pid, const char *addr_str) {
 			// Send "408 Request Timeout"
 			zhttpd_log(LOG_INFO, "Client request timeout");
 
-			send_error_response(NULL, sock, 408);
+			send_error_response(&context, 408);
 			run_child_main_loop = 0;
 		}
 

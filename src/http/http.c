@@ -635,9 +635,9 @@ int http_response_get_start_string(http_response *resp, char **out) {
 	}
 
 	// Add Content-Length if needed
-	if (http_response_header_exists(resp, "Content-Length") == 0 && resp->no_payload == 0) {
+	if (code != 200 && http_response_header_exists(resp, "Content-Length") == 0 && resp->no_payload == 0) {
 		char *len_str = calloc(10, sizeof(char));
-		snprintf(len_str, 10, "%lu", resp->content_length);
+		snprintf(len_str, 10, "%u", resp->content_length);
 		int cl_r = http_response_add_header2(resp, "Content-Length", len_str);
 		free(len_str);
 		if (cl_r < 0) return ERROR_RESPONSE_STRING_CREATE_FAILED;
@@ -733,4 +733,119 @@ int http_response_string(http_response *resp, char **out) {
 	*out = tmp_out;
 
 	return used;
+}
+
+int http_response_serve_file(http_context *ctx) {
+
+	char *file_path = ctx->file_path;
+	http_request *req = ctx->request;
+	http_response *resp = ctx->response;
+	int sock = ctx->_sock;
+
+	// Get file size
+	off_t f_size;
+	int sz_stat = get_file_size(file_path, &f_size);
+	if (sz_stat < 0) return sz_stat;
+
+	// Add Content-Length
+	char len_str[10];
+	snprintf(len_str, 10, "%lu", f_size);
+	http_response_add_header2(resp, "Content-Length", len_str);
+
+	// TODO: Keep this in child.c?
+	// Check if the request contains If-Modified-Since
+	http_header *if_mod_since_h = http_request_get_header(req, "If-Modified-Since");
+	if (if_mod_since_h != NULL) {
+		// Convert textual time representation to time_t
+		struct tm if_mod_since_tm;
+		if (strptime(if_mod_since_h->value, HTTP_DATE_FORMAT, &if_mod_since_tm) == NULL) {
+			// strptime failed
+			zhttpd_log(LOG_ERROR, "If-Modified-Since date parsing failed!");
+		} else {
+			// strptime succeeded
+			resp->if_mod_since_time = timegm(&if_mod_since_tm);
+		}
+	}
+
+	// Get HTTP status line and headers
+	char *tmp_out;
+	int start_len = http_response_get_start_string(resp, &tmp_out);
+	if (start_len < 0) {
+		return start_len;
+	}
+
+	if (resp->no_payload) {
+		// Don't send file contents
+		if (sendall(sock, tmp_out, start_len) == -1) {
+			zhttpd_log(LOG_ERROR, "Response sending failed!");
+			perror("resp start sendall");
+			free(tmp_out);
+			return ERROR_RESPONSE_SEND_FAILED;
+		}
+		return 0;
+	}
+
+	if (sendall(sock, tmp_out, start_len) == -1) {
+		zhttpd_log(LOG_ERROR, "Response sending failed!");
+		perror("resp start sendall");
+		free(tmp_out);
+		return ERROR_RESPONSE_SEND_FAILED;
+	}
+	free(tmp_out);
+
+	// Send file
+	// Read file in chunks (not to be confused with HTTP Transfer-Encoding chunking)
+	FILE *f = fopen(file_path, "r");
+	char buf[2048] = {0};	// TODO: Set buffer size in defines or config
+	int read_bytes = 0;
+	int send_failed = 0;
+	while ((read_bytes = fread(buf, sizeof(char), 2048, f)) > 0) {
+		if (sendall(sock, buf, read_bytes) == -1) {
+			zhttpd_log(LOG_ERROR, "Response sending failed!");
+			perror("file sendall");
+			send_failed = 1;
+			break;
+		}
+	}
+	if (feof(f) == 0 && ferror(f) != 0) {
+		// Error
+		zhttpd_log(LOG_ERROR, "File reading failed!");
+		perror("fread");
+		send_failed = 1;
+	}
+	fclose(f);
+
+	if (send_failed) {
+		return ERROR_RESPONSE_SEND_FAILED;
+	}
+
+	return 0;
+}
+
+/**
+ * @brief Send HTTP response with given status code
+ * @details Sends HTTP response with given non-OK (200) status code
+ * 
+ * @param ctx HTTP Context
+ * @param status HTTP status code
+ * @return Sent byte count on success or < 0 on error
+ */
+int send_error_response(http_context *ctx, int status) {
+	http_response *resp = http_response_create(status);
+	resp->method = strdup(ctx->request->method);
+	if (strcmp(ctx->request->method, METHOD_HEAD) == 0) resp->no_payload = 1;
+	if (ctx->request != NULL) {
+		resp->keep_alive = ctx->request->keep_alive;
+	} else {
+		resp->keep_alive = 0;
+	}
+	char *resp_str;
+	int len = http_response_string(resp, &resp_str);
+	int write_res = 0;
+	if (len >= 0) {
+		write_res = sendall(ctx->_sock, resp_str, len);
+		free(resp_str);
+	}
+	http_response_free(resp);
+	return write_res;
 }

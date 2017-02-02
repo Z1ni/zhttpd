@@ -8,6 +8,7 @@
 
 #include "utils.h"
 #include "errors.h"
+#include "file_io.h"
 
 #define METHOD_GET "GET"
 #define METHOD_HEAD "HEAD"
@@ -67,6 +68,14 @@ typedef struct {
 	size_t _header_cap;			/**< Header list capacity ("private") */
 } http_response;
 
+typedef struct {
+	char *file_path;			/**< Requested file path in filesystem */
+	http_request *request;		/**< HTTP Request */
+	http_response *response;	/**< HTTP Response */
+
+	int _sock;					/**< Socket */
+} http_context;
+
 /**
  * HTTP status list entry
  */
@@ -123,6 +132,8 @@ void http_response_free(http_response *resp);
 
 int http_response_get_start_string(http_response *resp, char **out);
 int http_response_string(http_response *resp, char **out);
+int http_response_serve_file(http_context *ctx);
 
+int send_error_response(http_context *ctx, int status);
 
 #endif

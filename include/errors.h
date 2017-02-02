@@ -34,4 +34,7 @@
 #define ERROR_CGI_PROG_PATH_INVALID -3		/**< CGI program path is invalid (file not found or path points to a directory) */
 #define ERROR_CGI_SCRIPT_PATH_INVALID -4	/**< CGI script path is invalid (file not found or path points to a directory) */
 
+// Errors for http_response_serve_file()
+#define ERROR_RESPONSE_SEND_FAILED -1	/**< General send error */
+
 #endif
